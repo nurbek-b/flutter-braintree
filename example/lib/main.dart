@@ -132,7 +132,10 @@ class _MyAppState extends State<MyApp> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final request = BraintreePayPalRequest(amount: '13.37');
+                final request = BraintreePayPalRequest(
+                  amount: '13.37',
+                  payPalPaymentUserAction: PayPalPaymentUserAction.commit,
+                );
                 final result = await Braintree.requestPaypalNonce(
                   tokenizationKey,
                   request,
