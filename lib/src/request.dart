@@ -361,3 +361,42 @@ class BraintreeApplePayRequest {
         'supportedNetworks': supportedNetworks.map((e) => e.rawValue).toList(),
       };
 }
+
+class BraintreeThreeDSecureRequest {
+  BraintreeThreeDSecureRequest({
+    required this.nonce,
+    required this.amount,
+    required this.email,
+    required this.surname,
+    required this.givenName,
+    required this.billingAddress,
+  });
+
+  /// Payment method nonce.
+  String nonce;
+
+  /// Amount of the transaction.
+  String amount;
+
+  /// Email of the user.
+  String email;
+
+  /// Surname of the user.
+  String surname;
+
+  /// Given name of the user.
+  String givenName;
+
+  /// Billing address.
+  BraintreeBillingAddress billingAddress;
+
+  /// Converts this request object into a JSON-encodable format.
+  Map<String, dynamic> toJson() => {
+        'nonce': nonce,
+        'amount': amount,
+        'email': email,
+        'surname': surname,
+        'givenName': givenName,
+        'billingAddress': billingAddress.toJson(),
+      };
+}

@@ -45,4 +45,22 @@ class Braintree {
     if (result == null) return null;
     return BraintreePaymentMethodNonce.fromJson(result);
   }
+
+  /// Starts threeDSecureFlow for credit card payment.
+  ///
+  /// [authorization] must be either a valid client token or a valid tokenization key.
+  /// [request] should contain all information necessary for 3dSecure flow.
+  ///
+  /// Returns a [Future] that resolves to a [BraintreePaymentMethodNonce] if the tokenization was successful.
+  static Future<BraintreePaymentMethodNonce?> startThreeDSecureFlow(
+    String authorization,
+    BraintreeThreeDSecureRequest request,
+  ) async {
+    final result = await _kChannel.invokeMethod('startThreeDSecureFlow', {
+      'authorization': authorization,
+      'request': request.toJson(),
+    });
+    if (result == null) return null;
+    return BraintreePaymentMethodNonce.fromJson(result);
+  }
 }

@@ -1,4 +1,5 @@
 package com.example.flutter_braintree;
+
 import static com.braintreepayments.api.PayPalCheckoutRequest.USER_ACTION_COMMIT;
 import static com.braintreepayments.api.PayPalCheckoutRequest.USER_ACTION_DEFAULT;
 
@@ -23,8 +24,19 @@ import com.braintreepayments.api.PayPalPaymentIntent;
 import com.braintreepayments.api.PayPalRequest;
 import com.braintreepayments.api.PayPalVaultRequest;
 import com.braintreepayments.api.PaymentMethodNonce;
+import com.braintreepayments.api.ThreeDSecureV2UiCustomization;
 import com.braintreepayments.api.UserCanceledException;
 
+import com.braintreepayments.api.ThreeDSecureClient;
+import com.braintreepayments.api.ThreeDSecureRequest;
+import com.braintreepayments.api.ThreeDSecureResult;
+import com.braintreepayments.api.ThreeDSecureResultCallback;
+import com.braintreepayments.api.PaymentMethodNonce;
+import com.braintreepayments.api.ThreeDSecureAdditionalInformation;
+import com.braintreepayments.api.ThreeDSecurePostalAddress;
+import com.braintreepayments.api.ThreeDSecureRequest;
+import com.google.android.gms.wallet.TransactionInfo;
+import com.google.android.gms.wallet.WalletConstants;
 
 import java.util.HashMap;
 
@@ -52,6 +64,8 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                 payPalClient = new PayPalClient(this, braintreeClient);
                 payPalClient.setListener(this);
                 requestPaypalNonce();
+            } else if (type.equals("startThreeDSecureFlow")) {
+                startThreeDSecureFlow();
             } else {
                 throw new Exception("Invalid request type: " + type);
             }
@@ -70,16 +84,6 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         setIntent(newIntent);
     }
 
-//    @Override
-//    protected void onStart() {
-//        super.onStart();
-//    }
-
-//    @Override
-//    protected void onResume() {
-//        super.onResume();
-//    }
-
     protected void tokenizeCreditCard() {
         Intent intent = getIntent();
         Card card = new Card();
@@ -92,10 +96,10 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
         CardClient cardClient = new CardClient(braintreeClient);
         CardTokenizeCallback callback = (cardNonce, error) -> {
-            if(cardNonce != null){
+            if (cardNonce != null) {
                 onPaymentMethodNonceCreated(cardNonce);
             }
-            if(error != null){
+            if (error != null) {
                 onError(error);
             }
         };
@@ -153,7 +157,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
             nonceMap.put("paypalPayerId", paypalAccountNonce.getPayerId());
             nonceMap.put("typeLabel", "PayPal");
             nonceMap.put("description", paypalAccountNonce.getEmail());
-        }else if(paymentMethodNonce instanceof CardNonce){
+        } else if (paymentMethodNonce instanceof CardNonce) {
             CardNonce cardNonce = (CardNonce) paymentMethodNonce;
             nonceMap.put("typeLabel", cardNonce.getCardType());
             nonceMap.put("description", "ending in ••" + cardNonce.getLastTwo());
@@ -185,8 +189,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
     @Override
     public void onPayPalFailure(@NonNull Exception error) {
         if (error instanceof UserCanceledException) {
-            if(((UserCanceledException) error).isExplicitCancelation() || System.currentTimeMillis() - creationTimestamp > 500)
-            {
+            if (((UserCanceledException) error).isExplicitCancelation() || System.currentTimeMillis() - creationTimestamp > 500) {
                 // PayPal sometimes sends a UserCanceledException early for no reason: filter it out
                 // Otherwise take every cancellation event
                 onCancel();
@@ -195,4 +198,66 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
             onError(error);
         }
     }
+
+    public void startThreeDSecureFlow() {
+
+        Intent intent = getIntent();
+
+        // Extract data from intent
+        String nonce = intent.getStringExtra("nonce");
+        String amount = intent.getStringExtra("amount");
+        String email = intent.getStringExtra("email");
+
+        HashMap<String, String> billingAddressMap = (HashMap<String, String>) intent.getSerializableExtra("billingAddress");
+        String surname = billingAddressMap.get("surname");
+        String givenName = billingAddressMap.get("givenName");
+        String phoneNumber = billingAddressMap.get("phoneNumber");
+        String streetAddress = billingAddressMap.get("streetAddress");
+        String extendedAddress = billingAddressMap.get("extendedAddress");
+        String locality = billingAddressMap.get("locality");
+        String region = billingAddressMap.get("region");
+        String postalCode = billingAddressMap.get("postalCode");
+        String countryCodeAlpha2 = billingAddressMap.get("countryCodeAlpha2");
+
+        ThreeDSecurePostalAddress billingAddress = new ThreeDSecurePostalAddress();
+        billingAddress.setGivenName(givenName);
+        billingAddress.setSurname(surname);
+        billingAddress.setPhoneNumber(phoneNumber);
+        billingAddress.setStreetAddress(streetAddress);
+        billingAddress.setExtendedAddress(extendedAddress);
+        billingAddress.setLocality(locality);
+        billingAddress.setRegion(region);
+        billingAddress.setPostalCode(postalCode);
+        billingAddress.setCountryCodeAlpha2(countryCodeAlpha2);
+
+        // Create ThreeDSecureRequest and set parameters
+        ThreeDSecureRequest request = new ThreeDSecureRequest();
+        request.setNonce(nonce);
+        request.setAmount(amount);
+        request.setEmail(email);
+
+        request.setBillingAddress(billingAddress);
+
+//        // Customize UI
+//        ThreeDSecureV2UiCustomization uiCustomization = new ThreeDSecureV2UiCustomization();
+//        // Customize buttons, labels, text boxes, and toolbar as needed
+//        request.setV2UiCustomization(uiCustomization);
+
+        // Start ThreeDSecure flow
+        ThreeDSecureClient threeDSecureClient = new ThreeDSecureClient(braintreeClient);
+        threeDSecureClient.performVerification(this, request, new ThreeDSecureResultCallback() {
+            @Override
+            public void onResult(@Nullable ThreeDSecureResult threeDSecureResult, @Nullable Exception error) {
+                if (threeDSecureResult != null) {
+                    CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
+                    onPaymentMethodNonceCreated(cardNonce);
+                } else {
+                    onError(error);
+                }
+            }
+        });
+
+    }
+
+
 }
