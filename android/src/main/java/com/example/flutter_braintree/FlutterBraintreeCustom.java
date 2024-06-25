@@ -11,6 +11,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
+import com.braintreepayments.api.ThreeDSecureLookup;
+
 import com.braintreepayments.api.BraintreeClient;
 import com.braintreepayments.api.Card;
 import com.braintreepayments.api.CardClient;
@@ -39,6 +41,7 @@ import com.google.android.gms.wallet.TransactionInfo;
 import com.google.android.gms.wallet.WalletConstants;
 
 import java.util.HashMap;
+import java.util.Arrays;
 
 public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalListener {
     private BraintreeClient braintreeClient;
@@ -235,6 +238,8 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         request.setNonce(nonce);
         request.setAmount(amount);
         request.setEmail(email);
+        request.setChallengeRequested(true);
+        request.setRenderTypes(Arrays.asList(ThreeDSecureRequest.OTP));
 
         request.setBillingAddress(billingAddress);
 
@@ -245,11 +250,21 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
         // Start ThreeDSecure flow
         ThreeDSecureClient threeDSecureClient = new ThreeDSecureClient(braintreeClient);
+
+
         threeDSecureClient.performVerification(this, request, new ThreeDSecureResultCallback() {
             @Override
             public void onResult(@Nullable ThreeDSecureResult threeDSecureResult, @Nullable Exception error) {
                 if (threeDSecureResult != null) {
                     CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
+                    ThreeDSecureLookup lookup = threeDSecureResult.getLookup();
+                    System.out.println("ThreeDSecureLookup: " +
+                            "version: " + lookup.getThreeDSecureVersion() +
+                            ", acsUrl: " + lookup.getAcsUrl() +
+                            ", md: " + lookup.getMd() +
+                            ", pareq: " + lookup.getPareq() +
+                            ", termUrl: " + lookup.getTermUrl()
+                    );
                     onPaymentMethodNonceCreated(cardNonce);
                 } else {
                     onError(error);
