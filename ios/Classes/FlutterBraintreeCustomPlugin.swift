@@ -5,7 +5,7 @@ import BraintreeDropIn
 import os.log
 
 public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPlugin, BTViewControllerPresentingDelegate, BTThreeDSecureRequestDelegate {
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_braintree.custom", binaryMessenger: registrar.messenger())
         let instance = FlutterBraintreeCustomPlugin()
@@ -122,31 +122,43 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
     
     private func startThreeDSecureFlow(call: FlutterMethodCall, client: BTAPIClient, result: @escaping FlutterResult) {
         os_log("startThreeDSecureFlow called", log: OSLog.default, type: .info)
+        
         guard let amount = dict(for: "request", in: call)?["amount"] as? String else {
             os_log("startThreeDSecureFlow missing amount.", log: OSLog.default, type: .error)
             self.returnAuthorizationMissingError(result: result)
             self.isHandlingResult = false
             return
         }
+        
         guard let nonce = dict(for: "request", in: call)?["nonce"] as? String else {
             os_log("startThreeDSecureFlow missing nonce.", log: OSLog.default, type: .error)
             self.returnAuthorizationMissingError(result: result)
             self.isHandlingResult = false
             return
         }
+        
         os_log("startThreeDSecureFlow input nonce: %{public}@", log: OSLog.default, type: .info, nonce)
+        
         let threeDSecureRequest = BTThreeDSecureRequest()
         threeDSecureRequest.amount = NSDecimalNumber(string: amount)
         threeDSecureRequest.nonce = nonce
         threeDSecureRequest.email = dict(for: "request", in: call)?["email"] as? String
+        threeDSecureRequest.versionRequested = .version2
+        threeDSecureRequest.threeDSecureRequestDelegate = self
+        
         os_log("startThreeDSecureFlow request created.", log: OSLog.default, type: .info)
+        
         let paymentFlowDriver = BTPaymentFlowDriver(apiClient: client)
         paymentFlowDriver.viewControllerPresentingDelegate = self
-        threeDSecureRequest.threeDSecureRequestDelegate = self
+
+        os_log("Starting payment flow with Cardinal.", log: OSLog.default, type: .info)
         paymentFlowDriver.startPaymentFlow(threeDSecureRequest) { (paymentFlowResult, error) in
             os_log("startThreeDSecureFlow callback called.", log: OSLog.default, type: .info)
             if let error = error {
                 os_log("startThreeDSecureFlow error: %{public}@", log: OSLog.default, type: .error, error.localizedDescription)
+                result(FlutterError(code: "3DSecureError", message: error.localizedDescription, details: nil))
+                self.isHandlingResult = false
+                return
             }
             let threeDSecureResult = paymentFlowResult as? BTThreeDSecureResult
             os_log("startThreeDSecureFlow callback BTThreeDSecureResult type called.", log: OSLog.default, type: .info)
@@ -154,10 +166,33 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             self.isHandlingResult = false
         }
     }
-    
+        
     public func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult: BTThreeDSecureResult, next: @escaping () -> Void) {
         os_log("onLookupComplete called", log: OSLog.default, type: .info)
-        next()
+        
+        // Log details about the lookup result if available
+        if let lookup = lookupResult.lookup {
+            os_log("Cardinal session ID: %{public}@", log: OSLog.default, type: .info, lookup.transactionID ?? "N/A")
+            os_log("Cardinal lookup acsURL: %{public}@", log: OSLog.default, type: .info, lookup.acsURL?.absoluteString ?? "N/A")
+        } else {
+            os_log("No lookup result available", log: OSLog.default, type: .info)
+        }
+        
+        // Proceed with the next step if lookup succeeded
+        if lookupResult.lookup != nil {
+            os_log("Proceeding with challenge.", log: OSLog.default, type: .info)
+            next()
+        } else {
+            // Handle other statuses or errors
+            os_log("Lookup failed or other status.", log: OSLog.default, type: .info)
+            
+            // Create an error for demonstration purposes
+            let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "Cardinal lookup failed or other status"])
+            
+            // Ensure `flutterResult` is properly handled
+            self.handleResult(nonce: nil, error: error, flutterResult: self.completionBlock)
+            self.isHandlingResult = false
+        }
     }
     
     public func paymentDriver(_ driver: Any, requestsPresentationOf viewController: UIViewController) {
@@ -177,4 +212,6 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             viewController.dismiss(animated: true, completion: nil)
         }
     }
+
+
 }
