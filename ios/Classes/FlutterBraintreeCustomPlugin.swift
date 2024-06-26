@@ -5,7 +5,7 @@ import BraintreeDropIn
 import os.log
 
 public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPlugin, BTViewControllerPresentingDelegate, BTThreeDSecureRequestDelegate {
-
+    private var completionBlock: FlutterResult?
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_braintree.custom", binaryMessenger: registrar.messenger())
         let instance = FlutterBraintreeCustomPlugin()
@@ -26,6 +26,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             isHandlingResult = false
             return
         }
+        self.completionBlock = result  // Store the completion block here
         let client = BTAPIClient(authorization: authorization)
         switch call.method {
         case "requestPaypalNonce":
@@ -47,6 +48,20 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             returnBraintreeError(result: flutterResult, error: error)
         } else if let nonce = nonce {
             os_log("handleResult nonce: %{public}@", log: OSLog.default, type: .info, nonce.nonce)
+            if let cardNonce = nonce as? BTCardNonce {
+                let threeDSecureInfo = cardNonce.threeDSecureInfo 
+                            os_log("3D Secure liability shift possible: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShiftPossible))
+                            os_log("3D Secure liability shifted: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShifted))
+                            
+                            let resultDict: [String: Any] = [
+                                "nonce": nonce.nonce,
+                                "isDefault": nonce.isDefault,
+                                "liabilityShiftPossible": threeDSecureInfo.liabilityShiftPossible,
+                                "liabilityShifted": threeDSecureInfo.liabilityShifted
+                            ]
+                        
+            }
+
             flutterResult(buildPaymentNonceDict(nonce: nonce))
         } else {
             os_log("handleResult no nonce and no error.", log: OSLog.default, type: .info)
@@ -146,7 +161,14 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         threeDSecureRequest.versionRequested = .version2
         threeDSecureRequest.threeDSecureRequestDelegate = self
         
-        os_log("startThreeDSecureFlow request created.", log: OSLog.default, type: .info)
+        os_log("BTThreeDSecureRequest created with amount: %{public}@", log: OSLog.default, type: .info, amount)
+        os_log("BTThreeDSecureRequest created with nonce: %{public}@", log: OSLog.default, type: .info, nonce)
+        
+        if let email = threeDSecureRequest.email {
+            os_log("BTThreeDSecureRequest created with email: %{public}@", log: OSLog.default, type: .info, email)
+        } else {
+            os_log("BTThreeDSecureRequest created without email", log: OSLog.default, type: .info)
+        }
         
         let paymentFlowDriver = BTPaymentFlowDriver(apiClient: client)
         paymentFlowDriver.viewControllerPresentingDelegate = self
@@ -166,52 +188,61 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             self.isHandlingResult = false
         }
     }
-        
-    public func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult: BTThreeDSecureResult, next: @escaping () -> Void) {
+        public func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult result: BTThreeDSecureResult, next: @escaping () -> Void) {
         os_log("onLookupComplete called", log: OSLog.default, type: .info)
         
-        // Log details about the lookup result if available
-        if let lookup = lookupResult.lookup {
-            os_log("Cardinal session ID: %{public}@", log: OSLog.default, type: .info, lookup.transactionID ?? "N/A")
-            os_log("Cardinal lookup acsURL: %{public}@", log: OSLog.default, type: .info, lookup.acsURL?.absoluteString ?? "N/A")
-        } else {
-            os_log("No lookup result available", log: OSLog.default, type: .info)
-        }
-        
-        // Proceed with the next step if lookup succeeded
-        if lookupResult.lookup != nil {
-            os_log("Proceeding with challenge.", log: OSLog.default, type: .info)
-            next()
-        } else {
-            // Handle other statuses or errors
-            os_log("Lookup failed or other status.", log: OSLog.default, type: .info)
+        if let lookup = result.lookup {
             
-            // Create an error for demonstration purposes
-            let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "Cardinal lookup failed or other status"])
+            os_log("3D Secure lookup result available.", log: OSLog.default, type: .info)
+            os_log("ACS URL: %{public}@", log: OSLog.default, type: .info, lookup.acsURL?.absoluteString ?? "N/A")
+            os_log("MD: %{public}@", log: OSLog.default, type: .info, lookup.md ?? "N/A")
+            os_log("PAReq: %{public}@", log: OSLog.default, type: .info, lookup.paReq ?? "N/A")
+            os_log("TermURL: %{public}@", log: OSLog.default, type: .info, lookup.termURL?.absoluteString ?? "N/A")
+            os_log("Transaction ID: %{public}@", log: OSLog.default, type: .info, lookup.transactionID ?? "N/A")
+            os_log("Requires User Authentication: %{public}@", log: OSLog.default, type: .info, String(lookup.requiresUserAuthentication))
             
-            // Ensure `flutterResult` is properly handled
-            self.handleResult(nonce: nil, error: error, flutterResult: self.completionBlock)
+            if lookup.requiresUserAuthentication {
+                os_log("Proceeding with user authentication.", log: OSLog.default, type: .info)
+                next()
+            } else {
+                os_log("User authentication not required.", log: OSLog.default, type: .info)
+                let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "3D Secure lookup does not require user authentication"])
+                if let completion = self.completionBlock {
+                    self.handleResult(nonce: nil, error: error, flutterResult: completion)
+                }
+                self.isHandlingResult = false
+            }
+        } else {
+            os_log("3D Secure lookup failed or returned no result.", log: OSLog.default, type: .error)
+            let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "3D Secure lookup failed or returned no result"])
+            if let completion = self.completionBlock {
+                self.handleResult(nonce: nil, error: error, flutterResult: completion)
+            }
             self.isHandlingResult = false
         }
-    }
+}
     
     public func paymentDriver(_ driver: Any, requestsPresentationOf viewController: UIViewController) {
         os_log("Presenting viewController: %{public}@", log: OSLog.default, type: .info, String(describing: viewController))
         DispatchQueue.main.async {
             if let rootViewController = UIApplication.shared.keyWindow?.rootViewController {
-                rootViewController.present(viewController, animated: true, completion: nil)
+                os_log("Root view controller: %{public}@", log: OSLog.default, type: .info, String(describing: rootViewController))
+                rootViewController.present(viewController, animated: true) {
+                    os_log("View controller presented: %{public}@", log: OSLog.default, type: .info, String(describing: viewController))
+                }
             } else {
                 os_log("Failed to get root view controller.", log: OSLog.default, type: .error)
             }
         }
     }
-
+    
     public func paymentDriver(_ driver: Any, requestsDismissalOf viewController: UIViewController) {
         os_log("Dismissing viewController: %{public}@", log: OSLog.default, type: .info, String(describing: viewController))
         DispatchQueue.main.async {
-            viewController.dismiss(animated: true, completion: nil)
+            viewController.dismiss(animated: true) {
+                os_log("View controller dismissed: %{public}@", log: OSLog.default, type: .info, String(describing: viewController))
+            }
         }
     }
-
 
 }
