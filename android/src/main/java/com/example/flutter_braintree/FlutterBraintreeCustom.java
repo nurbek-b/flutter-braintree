@@ -243,34 +243,49 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
         request.setBillingAddress(billingAddress);
 
-//        // Customize UI
-//        ThreeDSecureV2UiCustomization uiCustomization = new ThreeDSecureV2UiCustomization();
-//        // Customize buttons, labels, text boxes, and toolbar as needed
-//        request.setV2UiCustomization(uiCustomization);
+        //        // Customize UI
+        //        ThreeDSecureV2UiCustomization uiCustomization = new ThreeDSecureV2UiCustomization();
+        //        // Customize buttons, labels, text boxes, and toolbar as needed
+        //        request.setV2UiCustomization(uiCustomization);
 
-        // Start ThreeDSecure flow
-        ThreeDSecureClient threeDSecureClient = new ThreeDSecureClient(braintreeClient);
-
-
-        threeDSecureClient.performVerification(this, request, new ThreeDSecureResultCallback() {
+        // Ensure that the UI operations are performed on the main thread
+        runOnUiThread(new Runnable() {
             @Override
-            public void onResult(@Nullable ThreeDSecureResult threeDSecureResult, @Nullable Exception error) {
-                if (threeDSecureResult != null) {
-                    CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
-                    ThreeDSecureLookup lookup = threeDSecureResult.getLookup();
-                    System.out.println("ThreeDSecureLookup: " +
-                            "version: " + lookup.getThreeDSecureVersion() +
-                            ", acsUrl: " + lookup.getAcsUrl() +
-                            ", md: " + lookup.getMd() +
-                            ", pareq: " + lookup.getPareq() +
-                            ", termUrl: " + lookup.getTermUrl()
-                    );
-                    onPaymentMethodNonceCreated(cardNonce);
-                } else {
-                    onError(error);
-                }
+            public void run() {
+                // Start ThreeDSecure flow
+                ThreeDSecureClient threeDSecureClient = new ThreeDSecureClient(braintreeClient);
+                threeDSecureClient.performVerification(FlutterBraintreeCustom.this, request, new ThreeDSecureResultCallback() {
+                    @Override
+                    public void onResult(@Nullable ThreeDSecureResult threeDSecureResult, @Nullable Exception error) {
+                        Log.d("FlutterBraintreeCustom", "3D Secure flow completed");
+
+                        if (threeDSecureResult != null) {
+                            CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
+                            ThreeDSecureLookup lookup = threeDSecureResult.getLookup();
+                            System.out.println("ThreeDSecureLookup: " +
+                                    "version: " + lookup.getThreeDSecureVersion() +
+                                    ", acsUrl: " + lookup.getAcsUrl() +
+                                    ", md: " + lookup.getMd() +
+                                    // ", pareq: " + lookup.getPareq() +
+                                    // ", termUrl: " + lookup.getTermUrl() +
+                                "");
+                            onPaymentMethodNonceCreated(cardNonce);
+                        } else {
+                            Log.e("FlutterBraintreeCustom", "Error in 3D Secure flow", error);
+                            onError(error);
+                        }
+                    }
+                
+                });
             }
         });
+        
+
+
+
+
+
+ 
 
     }
 
