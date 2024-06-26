@@ -116,20 +116,38 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
     }
     
     private func handleCreditCardTokenization(call: FlutterMethodCall, client: BTAPIClient, result: @escaping FlutterResult) {
-        let cardClient = BTCardClient(apiClient: client)
-        guard let cardRequestInfo = dict(for: "request", in: call) else { 
-            os_log("handleCreditCardTokenization missing card request info.", log: OSLog.default, type: .error)
+        os_log("handleCreditCardTokenization called", log: OSLog.default, type: .info)
+
+        guard let cardRequestInfo = dict(for: "request", in: call) else {
+            os_log("handleCreditCardTokenization Missing card request info.", log: OSLog.default, type: .error)
             isHandlingResult = false
-            return 
+            return
         }
+
         let card = BTCard()
         card.number = cardRequestInfo["cardNumber"] as? String
         card.expirationMonth = cardRequestInfo["expirationMonth"] as? String
         card.expirationYear = cardRequestInfo["expirationYear"] as? String
         card.cvv = cardRequestInfo["cvv"] as? String
         card.cardholderName = cardRequestInfo["cardholderName"] as? String
+        
+        let cardClient = BTCardClient(apiClient: client)
         cardClient.tokenizeCard(card) { (nonce, error) in
             os_log("handleCreditCardTokenization callback called.", log: OSLog.default, type: .info)
+            if let error = error {
+                os_log("handleCreditCardTokenization error: %{public}@", log: OSLog.default, type: .error, error.localizedDescription)
+                self.handleResult(nonce: nil, error: error, flutterResult: result)
+                self.isHandlingResult = false
+                return
+            }
+            os_log("handleCreditCardTokenization nonce: %{public}@", log: OSLog.default, type: .info, nonce?.nonce ?? "N/A")
+            
+            if let cardNonce = nonce as? BTCardNonce {
+                let threeDSecureInfo = cardNonce.threeDSecureInfo
+                os_log("3D Secure liability shift possible: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShiftPossible))
+                os_log("3D Secure liability shifted: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShifted))
+            }
+
             self.handleResult(nonce: nonce, error: error, flutterResult: result)
             self.isHandlingResult = false
         }
@@ -206,11 +224,12 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                 next()
             } else {
                 os_log("User authentication not required.", log: OSLog.default, type: .info)
-                let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "3D Secure lookup does not require user authentication"])
-                if let completion = self.completionBlock {
-                    self.handleResult(nonce: nil, error: error, flutterResult: completion)
-                }
-                self.isHandlingResult = false
+                // let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "3D Secure lookup does not require user authentication"])
+                // if let completion = self.completionBlock {
+                //     self.handleResult(nonce: nil, error: error, flutterResult: completion)
+                // }
+                // self.isHandlingResult = false
+                next()
             }
         } else {
             os_log("3D Secure lookup failed or returned no result.", log: OSLog.default, type: .error)
