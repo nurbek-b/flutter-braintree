@@ -254,3 +254,18 @@ var request = BraintreeDropInRequest(
 ```
 
 See `BraintreeDropInRequest` and `BraintreeDropInResult` for more documentation.
+
+for prepare data to GTPs 
+find ./lib -type f | grep -vE '\.(DS_Store)$' | while read file; do echo "Processing $file"; echo "Filename: $file" >> flutter_braintree_lib.txt; cat "$file" >> flutter_braintree_lib.txt; echo "\n" >> flutter_braintree_lib.txt; done; echo "All files processed successfully."
+find ./android -type f | grep -vE '\.(jar|lock|bin)$' | while read file; do echo "Processing $file"; echo "Filename: $file" >> flutter_braintree_android.txt; cat "$file" >> flutter_braintree_android.txt; echo "\n" >> flutter_braintree_android.txt; done; echo "All files processed successfully."
+find ./lib -type f | grep -vE '\.(DS_Store)$' | while read file; do echo "Processing $file"; echo "Filename: $file" >> flutter_braintree_ios.txt; cat "$file" >> flutter_braintree_ios.txt; echo "\n" >> flutter_braintree_ios.txt; done; echo "All files processed successfully."
+
+find ./ -type f | grep -vE '\.(jar|lock|bin|DS_Store|keystore|pack|png|aar|idx|apk)$' | while read file; do echo "Processing $file"; echo "Filename: $file" >> braintree_android_sdk.txt; cat "$file" >> braintree_android_sdk.txt; echo "\n" >> braintree_android_sdk.txt; done; echo "All files processed successfully."
+
+split -b 1m braintree_android_sdk.txt braintree_android_sdk_part_ 
+n=1
+for file in temp_part_*; do
+  mv "$file" "part_${n}.txt"
+  n=$((n + 1))
+done
+

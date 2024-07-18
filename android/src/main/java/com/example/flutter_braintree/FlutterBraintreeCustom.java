@@ -59,6 +59,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         try {
             Intent intent = getIntent();
             String returnUrlScheme = (getPackageName() + ".return.from.braintree").replace("_", "").toLowerCase();
+            Log.d("FlutterBraintreeCustom", "returnUrlScheme = " + returnUrlScheme);
             braintreeClient = new BraintreeClient(this, intent.getStringExtra("authorization"), returnUrlScheme);
             String type = intent.getStringExtra("type");
             if (type.equals("tokenizeCreditCard")) {
@@ -202,8 +203,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         }
     }
 
-    public void startThreeDSecureFlow() {
-
+   public void startThreeDSecureFlow() {
         Intent intent = getIntent();
 
         // Extract data from intent
@@ -238,56 +238,44 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         request.setNonce(nonce);
         request.setAmount(amount);
         request.setEmail(email);
-        request.setChallengeRequested(true);
-        request.setRenderTypes(Arrays.asList(ThreeDSecureRequest.OTP));
 
         request.setBillingAddress(billingAddress);
 
-        //        // Customize UI
-        //        ThreeDSecureV2UiCustomization uiCustomization = new ThreeDSecureV2UiCustomization();
-        //        // Customize buttons, labels, text boxes, and toolbar as needed
-        //        request.setV2UiCustomization(uiCustomization);
+        request.setVersionRequested(ThreeDSecureRequest.VERSION_2);
 
-        // Ensure that the UI operations are performed on the main thread
-        runOnUiThread(new Runnable() {
+        // Start ThreeDSecure flow
+        ThreeDSecureClient threeDSecureClient = new ThreeDSecureClient(braintreeClient);
+      
+        threeDSecureClient.performVerification(FlutterBraintreeCustom.this, request, new ThreeDSecureResultCallback() {
             @Override
-            public void run() {
-                // Start ThreeDSecure flow
-                ThreeDSecureClient threeDSecureClient = new ThreeDSecureClient(braintreeClient);
-                threeDSecureClient.performVerification(FlutterBraintreeCustom.this, request, new ThreeDSecureResultCallback() {
-                    @Override
-                    public void onResult(@Nullable ThreeDSecureResult threeDSecureResult, @Nullable Exception error) {
-                        Log.d("FlutterBraintreeCustom", "3D Secure flow completed");
+            public void onResult(@Nullable ThreeDSecureResult threeDSecureResult, @Nullable Exception error) {
+                Log.d("FlutterBraintreeCustom", "3D Secure flow completed");
 
-                        if (threeDSecureResult != null) {
-                            CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
-                            ThreeDSecureLookup lookup = threeDSecureResult.getLookup();
-                            System.out.println("ThreeDSecureLookup: " +
-                                    "version: " + lookup.getThreeDSecureVersion() +
-                                    ", acsUrl: " + lookup.getAcsUrl() +
-                                    ", md: " + lookup.getMd() +
-                                    // ", pareq: " + lookup.getPareq() +
-                                    // ", termUrl: " + lookup.getTermUrl() +
-                                "");
-                            onPaymentMethodNonceCreated(cardNonce);
-                        } else {
-                            Log.e("FlutterBraintreeCustom", "Error in 3D Secure flow", error);
-                            onError(error);
-                        }
-                    }
-                
-                });
+                if (threeDSecureResult != null) {
+                    CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
+                    ThreeDSecureLookup lookup = threeDSecureResult.getLookup();
+                    System.out.println("ThreeDSecureLookup: " +
+                            "version: " + lookup.getThreeDSecureVersion() +
+                            ", acsUrl: " + lookup.getAcsUrl() +
+                            ", md: " + lookup.getMd() +
+                            // ", pareq: " + lookup.getPareq() +
+                            // ", termUrl: " + lookup.getTermUrl() +
+                        "");
+
+                    // optional: inspect the lookup result and prepare UI if a challenge is required
+                    threeDSecureClient.continuePerformVerification(FlutterBraintreeCustom.this, request, threeDSecureResult);
+
+                    onPaymentMethodNonceCreated(cardNonce);
+                } else {
+                    Log.e("FlutterBraintreeCustom", "Error in 3D Secure flow", error);
+                    onError(error);
+                }
             }
         });
-        
-
-
-
-
-
- 
 
     }
+
+    
 
 
 }
