@@ -37,17 +37,25 @@ import com.braintreepayments.api.PaymentMethodNonce;
 import com.braintreepayments.api.ThreeDSecureAdditionalInformation;
 import com.braintreepayments.api.ThreeDSecurePostalAddress;
 import com.braintreepayments.api.ThreeDSecureRequest;
+
+import com.braintreepayments.api.GooglePayClient;
+import com.braintreepayments.api.GooglePayRequest;
+import com.braintreepayments.api.GooglePayListener;
+import com.braintreepayments.api.GooglePayCardNonce;
+
 import com.google.android.gms.wallet.TransactionInfo;
 import com.google.android.gms.wallet.WalletConstants;
+
 
 import java.util.HashMap;
 import java.util.Arrays;
 
-public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalListener {
+public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalListener, GooglePayListener {
     private BraintreeClient braintreeClient;
     private PayPalClient payPalClient;
     private Boolean started = false;
     private long creationTimestamp = -1;
+    private GooglePayClient googlePayClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,7 +77,9 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                 payPalClient.setListener(this);
                 requestPaypalNonce();
             } else if (type.equals("startThreeDSecureFlow")) {
-                startThreeDSecureFlow();
+                startThreeDSecureFlow();        
+            } else if (type.equals("startGooglePaymentFlow")) {
+                startGooglePaymentFlow();
             } else {
                 throw new Exception("Invalid request type: " + type);
             }
@@ -165,6 +175,12 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
             CardNonce cardNonce = (CardNonce) paymentMethodNonce;
             nonceMap.put("typeLabel", cardNonce.getCardType());
             nonceMap.put("description", "ending in ••" + cardNonce.getLastTwo());
+        } else if (paymentMethodNonce instanceof GooglePayCardNonce) {
+            GooglePayCardNonce googlePayCardNonce = (GooglePayCardNonce) paymentMethodNonce;
+            nonceMap.put("cardType", googlePayCardNonce.getCardType());
+            nonceMap.put("typeLabel", "GooglePay");
+            nonceMap.put("description", googlePayCardNonce.getEmail());
+            nonceMap.put("lastTwo", googlePayCardNonce.getLastTwo());
         }
         Intent result = new Intent();
         result.putExtra("type", "paymentMethodNonce");
@@ -203,7 +219,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         }
     }
 
-   public void startThreeDSecureFlow() {
+    public void startThreeDSecureFlow() {
         Intent intent = getIntent();
 
         // Extract data from intent
@@ -275,7 +291,56 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
     }
 
-    
+
+    private void startGooglePaymentFlow() {
+        Intent intent = getIntent();
+        String totalPrice = intent.getStringExtra("totalPrice");
+        
+        googlePayClient = new GooglePayClient(this, braintreeClient);
+        googlePayClient.setListener(this);
+
+        // ReadyForGooglePayRequest request = new ReadyForGooglePayRequest.Builder()
+        //         .setExistingPaymentMethodRequired(true)
+        //         .build();
+
+        //    googlePayClient.isReadyToPay(this, request, (isReadyToPay, error) -> {        
+            
+        googlePayClient.isReadyToPay(this, (isReadyToPay, error) -> {
+        if (isReadyToPay) {
+            GooglePayRequest googlePayRequest = new GooglePayRequest();
+            googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
+                .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
+                .setTotalPrice(totalPrice)
+                .setCurrencyCode("USD")
+                .build());
+
+        googlePayClient.requestPayment(this, googlePayRequest);
+            
+        }else{
+            onError(new Exception("Google Pay is not ready to pay."));
+        }
+        });
+
+
+        
+    }
+
+    @Override
+    public void onGooglePaySuccess(@NonNull PaymentMethodNonce paymentMethodNonce) {
+        Log.d("onGooglePaySuccess", "paymentMethodNonce = " + paymentMethodNonce.getString());
+        onPaymentMethodNonceCreated(paymentMethodNonce);
+    }
+
+    @Override
+    public void onGooglePayFailure(@NonNull Exception error) {
+        if (error instanceof UserCanceledException) {
+            onCancel() ;
+        // user canceled
+        } else {
+        onError(error);
+        }
+ 
+    }
 
 
 }

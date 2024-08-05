@@ -63,4 +63,47 @@ class Braintree {
     if (result == null) return null;
     return BraintreePaymentMethodNonce.fromJson(result);
   }
+
+  /// Initiates the Google Payment flow.
+  ///
+  /// [authorization] must be either a valid client token or a valid tokenization key.
+  /// [paymentRequest] should contain all information necessary for the Google Payment flow.
+  ///
+  /// Returns a [Future] that resolves to a [BraintreePaymentMethodNonce] if the payment was successful.
+  static Future<BraintreePaymentMethodNonce?> startGooglePaymentFlow(
+    String authorization,
+    BraintreeGooglePaymentRequest paymentRequest,
+  ) async {
+    final result = await _kChannel.invokeMethod('startGooglePaymentFlow', {
+      'authorization': authorization,
+      'request': paymentRequest.toJson(),
+    });
+    if (result == null) return null;
+    print(result);
+    return BraintreePaymentMethodNonce.fromJson(result);
+  }
+
+  /// Initiates the Apple Payment flow.
+  ///
+  /// [authorization] must be either a valid client token or a valid tokenization key.
+  /// [paymentRequest] should contain all information necessary for the Apple Payment flow.
+  ///
+  /// Returns a [Future] that resolves to a [BraintreePaymentMethodNonce] if the payment was successful.
+  static Future<BraintreePaymentMethodNonce?> startApplePaymentFlow(
+    String authorization,
+    BraintreeApplePayRequest paymentRequest,
+  ) async {
+    dynamic result;
+    try {
+      result = await _kChannel.invokeMethod('startApplePaymentFlow', {
+        'authorization': authorization,
+        'request': paymentRequest.toJson(),
+      });
+    } on PlatformException catch (e) {
+      throw 'Failed to start Apple Pay flow: ${e.message}';
+    }
+    if (result == null) return null;
+    print(result);
+    return BraintreePaymentMethodNonce.fromJson(result);
+  }
 }
