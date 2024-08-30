@@ -5,7 +5,7 @@ import BraintreeDropIn
 import PassKit
 import os.log
 
-public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPlugin, BTViewControllerPresentingDelegate, BTThreeDSecureRequestDelegate, PKPaymentAuthorizationViewControllerDelegate {
+public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPlugin, BTViewControllerPresentingDelegate, BTThreeDSecureRequestDelegate,  PKPaymentAuthorizationViewControllerDelegate {
     private var completionBlock: FlutterResult?
     private var applePayClient: BTApplePayClient?
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -31,6 +31,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         self.completionBlock = result
         let client = BTAPIClient(authorization: authorization)
         self.applePayClient = BTApplePayClient(apiClient: client!)
+        os_log("applePayClient initialized.", log: OSLog.default, type: .info)
         switch call.method {
         case "requestPaypalNonce":
             handlePayPalNonce(call: call, client: client!, result: result)
@@ -236,7 +237,9 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         // You can also create the PKPaymentRequest manually. Be aware that you'll need to keep these in
         // sync with the gateway settings if you go this route.
         self.applePayClient?.paymentRequest { (providedPaymentRequest, error) in
+            os_log("Inside paymentRequest callback", log: OSLog.default, type: .info)
             guard let paymentRequest = providedPaymentRequest, error == nil else {
+                os_log("Error in paymentRequest creation: %@", log: OSLog.default, type: .error, String(describing: error))
                 self.returnBraintreeError(result: result, error: error!)
                 self.isHandlingResult = false
                 return
@@ -261,7 +264,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                 }
                 
                 if let amountDouble = item["amount"] as? Double {
-                    os_log("Extracted amount: %f", log: OSLog.default, type: .info, amountDouble)
+                    os_log("Extracted amount actual: %f", log: OSLog.default, type: .info, amountDouble)
                     let amountString = String(amountDouble)
                     let amount = NSDecimalNumber(string: amountString)
                     if let label = item["label"] as? String {
@@ -275,7 +278,20 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                 }
             }
             paymentRequest.paymentSummaryItems = paymentSummaryItems
-            
+
+            os_log("paymentRequest created:", log: OSLog.default, type: .info)
+            os_log("paymentRequest.merchantIdentifier: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.merchantIdentifier))
+            os_log("paymentRequest.supportedNetworks: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.supportedNetworks))
+            os_log("paymentRequest.countryCode: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.countryCode))
+            os_log("paymentRequest.currencyCode: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.currencyCode))
+            os_log("paymentRequest.merchantCapabilities: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.merchantCapabilities))
+            os_log("paymentRequest.supportedNetworks: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.supportedNetworks))
+            os_log("paymentRequest.requiredBillingContactFields: %@", log: OSLog.default, type: .info, String(describing: paymentRequest.requiredBillingContactFields))
+            os_log("paymentRequest.paymentSummaryItems:", log: OSLog.default, type: .info)
+            for item in paymentRequest.paymentSummaryItems {
+                os_log("label: %@, amount: %@", log: OSLog.default, type: .info, item.label, item.amount)
+            }
+
             if let vc = PKPaymentAuthorizationViewController(paymentRequest: paymentRequest)
                 as PKPaymentAuthorizationViewController?
             {
@@ -293,30 +309,35 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                                   handler completion: @escaping (PKPaymentAuthorizationResult) -> Void) {
 
         // Tokenize the Apple Pay payment
-        
+        os_log("Tokenize the Apple Pay payment", log: OSLog.default, type: .info)
 
         self.applePayClient?.tokenizeApplePay(payment) { (nonce, error) in
             if error != nil {
-                // Received an error from Braintree.
-                // Indicate failure via the completion callback.
+                os_log("Tokenize the Apple Pay payment fails with error %@", log: OSLog.default, type: .error, String(describing: error))
+                self.handleResult(nonce: nonce, error: nil, flutterResult: self.completionBlock!)
                 completion(PKPaymentAuthorizationResult(status: .failure, errors: nil))
+                self.isHandlingResult = false
                 return
             }
-
-            // TODO: On success, send nonce to your server for processing.
-            // If requested, address information is accessible in 'payment' and may
-            // also be sent to your server.
-
-            // Then indicate success or failure based on the server side result of Transaction.sale
-            // via the completion callback.
-            // e.g. If the Transaction.sale was successful
+            if let nonce = nonce {
+                self.handleResult(nonce: nonce, error: nil, flutterResult: self.completionBlock!)
+            }
+            os_log("Tokenize the Apple Pay payment successed", log: OSLog.default, type: .info)
             completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
+            self.isHandlingResult = false
         }
     }
 
     public func paymentAuthorizationViewControllerDidFinish(_ controller: PKPaymentAuthorizationViewController) {
-        // Apple Payment finished
+        os_log("Apple Payment finished", log: OSLog.default, type: .info)
+        
+        // Ensure any results are returned to Flutter
+        if let completionBlock = self.completionBlock {
+            completionBlock(nil) // or pass any other result if needed
+            self.completionBlock = nil
+        }
         self.paymentDriver(self, requestsDismissalOf: controller)
+        self.isHandlingResult = false
     }
 
     public func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult result: BTThreeDSecureResult, next: @escaping () -> Void) {
