@@ -8,6 +8,7 @@ import os.log
 public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPlugin, BTViewControllerPresentingDelegate, BTThreeDSecureRequestDelegate,  PKPaymentAuthorizationViewControllerDelegate {
     private var completionBlock: FlutterResult?
     private var applePayClient: BTApplePayClient?
+    private var deviceData: String?
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_braintree.custom", binaryMessenger: registrar.messenger())
         let instance = FlutterBraintreeCustomPlugin()
@@ -31,6 +32,21 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         self.completionBlock = result
         let client = BTAPIClient(authorization: authorization)
         self.applePayClient = BTApplePayClient(apiClient: client!)
+
+        // Initialize Data Collector
+        let dataCollector = BTDataCollector(apiClient: client!)
+
+        // Collect Device Data
+        dataCollector.collectDeviceData { (deviceData: String?) in
+            if let deviceData = deviceData {
+                self.deviceData = deviceData
+                print("Collected Device Data: \(deviceData)")
+                // Send device data to your server for processing the transaction
+            } else {
+                print("Failed to collect device data")
+            }
+        }
+
         os_log("applePayClient initialized.", log: OSLog.default, type: .info)
         switch call.method {
         case "requestPaypalNonce":
@@ -63,12 +79,20 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                                 "nonce": nonce.nonce,
                                 "isDefault": nonce.isDefault,
                                 "liabilityShiftPossible": threeDSecureInfo.liabilityShiftPossible,
-                                "liabilityShifted": threeDSecureInfo.liabilityShifted
+                                "liabilityShifted": threeDSecureInfo.liabilityShifted,
+                                "deviceData": self.deviceData as Any
                             ]
                         
             }
-
-            flutterResult(buildPaymentNonceDict(nonce: nonce))
+            // flutterResult(buildPaymentNonceDict(nonce: nonce))
+            let resultDict: [String: Any] = [
+                    "nonce": nonce.nonce,
+                    "typeLabel": nonce.type,
+                    "description": nonce.description,
+                    "isDefault": nonce.isDefault,
+                    "deviceData": self.deviceData as Any
+                ]
+            flutterResult(resultDict)
         } else {
             os_log("handleResult no nonce and no error.", log: OSLog.default, type: .info)
             flutterResult(nil)
@@ -314,8 +338,8 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         self.applePayClient?.tokenizeApplePay(payment) { (nonce, error) in
             if error != nil {
                 os_log("Tokenize the Apple Pay payment fails with error %@", log: OSLog.default, type: .error, String(describing: error))
-                self.handleResult(nonce: nonce, error: nil, flutterResult: self.completionBlock!)
-                completion(PKPaymentAuthorizationResult(status: .failure, errors: nil))
+                self.handleResult(nonce: nil, error: error, flutterResult: self.completionBlock!)
+                completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
                 self.isHandlingResult = false
                 return
             }
