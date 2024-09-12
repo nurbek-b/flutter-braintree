@@ -14,9 +14,10 @@ class ApplePayHandler: NSObject, PKPaymentAuthorizationViewControllerDelegate  {
     }
 
     static func canMakePayments() -> Bool {
-        let canMakePayments = PKPaymentAuthorizationViewController.canMakePayments(usingNetworks: [.visa, .masterCard, .amex, .discover])
+        let canMakePayments = PKPaymentAuthorizationViewController.canMakePayments(usingNetworks: [.visa, .masterCard, .amex, .discover], capabilities: .capability3DS)
         os_log("Can make Apple Pay payments: %{public}@", log: .default, type: .debug, String(canMakePayments))
         return canMakePayments
+        // return false
     }
 
 

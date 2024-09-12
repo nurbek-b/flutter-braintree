@@ -103,9 +103,13 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
     private func handlePayPalNonce(call: FlutterMethodCall, client: BTAPIClient, result: @escaping FlutterResult) {
         let driver = BTPayPalDriver(apiClient: client)
         guard let requestInfo = dict(for: "request", in: call) else {
+            os_log("Missing request info for PayPal", log: OSLog.default, type: .error)
+            result(FlutterError(code: "MISSING_REQUEST_INFO", message: "PayPal request info is missing", details: nil))
             isHandlingResult = false
             return
         }
+        os_log("PayPal request info: %{public}@", log: OSLog.default, type: .info, String(describing: requestInfo))
+
         if let amount = requestInfo["amount"] as? String {
             let paypalRequest = BTPayPalCheckoutRequest(amount: amount)
             paypalRequest.currencyCode = requestInfo["currencyCode"] as? String
@@ -129,8 +133,19 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                     paypalRequest.userAction = .default
                 }
             }
+            os_log("Amount: %{public}@", log: OSLog.default, type: .info, amount)
+            os_log("Currency Code: %{public}@", log: OSLog.default, type: .info, paypalRequest.currencyCode ?? "nil")
+            os_log("Display Name: %{public}@", log: OSLog.default, type: .info, paypalRequest.displayName ?? "nil")
+            os_log("Tokenizing PayPal account...", log: OSLog.default, type: .info)
             driver.tokenizePayPalAccount(with: paypalRequest) { (nonce, error) in
                 os_log("handlePayPalNonce callback called.", log: OSLog.default, type: .info)
+                if let nonce = nonce {
+                    os_log("PayPal tokenization successful. Nonce: %{public}@", log: OSLog.default, type: .info, nonce.nonce)
+                } else if let error = error {
+                    os_log("PayPal tokenization error: %{public}@", log: OSLog.default, type: .error, error.localizedDescription)
+                } else {
+                    os_log("PayPal tokenization: No nonce and no error.", log: OSLog.default, type: .error)
+                }
                 self.handleResult(nonce: nonce, error: error, flutterResult: result)
                 self.isHandlingResult = false
             }
@@ -138,8 +153,16 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             let paypalRequest = BTPayPalVaultRequest()
             paypalRequest.displayName = requestInfo["displayName"] as? String
             paypalRequest.billingAgreementDescription = requestInfo["billingAgreementDescription"] as? String
+            os_log("Tokenizing PayPal account (vault)...", log: OSLog.default, type: .info)
             driver.tokenizePayPalAccount(with: paypalRequest) { (nonce, error) in
                 os_log("handlePayPalNonce callback called (vault).", log: OSLog.default, type: .info)
+                if let nonce = nonce {
+                    os_log("PayPal tokenization successful (vault). Nonce: %{public}@", log: OSLog.default, type: .info, nonce.nonce)
+                } else if let error = error {
+                    os_log("PayPal tokenization error (vault): %{public}@", log: OSLog.default, type: .error, error.localizedDescription)
+                } else {
+                    os_log("PayPal tokenization (vault): No nonce and no error.", log: OSLog.default, type: .error)
+                }
                 self.handleResult(nonce: nonce, error: error, flutterResult: result)
                 self.isHandlingResult = false
             }
