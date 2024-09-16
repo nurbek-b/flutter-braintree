@@ -5,7 +5,7 @@ import os.log
 
 class ApplePayHandler: NSObject, PKPaymentAuthorizationViewControllerDelegate  {
     private var applePayClient: BTApplePayClient?
-    var completionBlock: ((BTPaymentMethodNonce?, Error?) -> Void)?
+    var completionBlock: (([String: Any]?, Error?) -> Void)?
     weak var presentingDelegate: BTViewControllerPresentingDelegate?
     private var hasCalledCompletion = false
 
@@ -21,7 +21,7 @@ class ApplePayHandler: NSObject, PKPaymentAuthorizationViewControllerDelegate  {
     }
 
 
-    func startApplePaymentFlow(paymentSummaryItems: [[String: Any]], completion: @escaping (BTPaymentMethodNonce?, Error?) -> Void) {
+    func startApplePaymentFlow(paymentSummaryItems: [[String: Any]], completion: @escaping ([String: Any]?, Error?) -> Void) {
         os_log("startApplePaymentFlow called", log: OSLog.default, type: .info)
         
         self.completionBlock = completion
@@ -121,6 +121,38 @@ class ApplePayHandler: NSObject, PKPaymentAuthorizationViewControllerDelegate  {
     }
     
 
+
+    func extractApplePayBillingInfo(from payment: PKPayment) -> [String: Any] {
+
+        os_log("Extracting Apple Pay billing info", log: OSLog.default, type: .info)
+        var billingInfo: [String: Any] = [:]
+        
+        if let billingContact = payment.billingContact {
+            if let name = billingContact.name {
+                let givenName = name.givenName ?? ""
+                let familyName = name.familyName ?? ""
+                billingInfo["name"] = "\(givenName) \(familyName)".trimmingCharacters(in: .whitespaces)
+            }
+            if let email = billingContact.emailAddress {
+                billingInfo["email"] = email
+            }
+            if let phone = billingContact.phoneNumber?.stringValue {
+                billingInfo["phone"] = phone
+            }
+            if let address = billingContact.postalAddress {
+                billingInfo["address"] = [
+                    "street": address.street,
+                    "city": address.city,
+                    "state": address.state,
+                    "country": address.country,
+                    "postalCode": address.postalCode
+                ]
+            }
+        }
+        
+        return billingInfo
+    }
+
     // MARK: - PKPaymentAuthorizationViewControllerDelegate
 
     public func paymentAuthorizationViewController(_ controller: PKPaymentAuthorizationViewController,
@@ -131,9 +163,16 @@ class ApplePayHandler: NSObject, PKPaymentAuthorizationViewControllerDelegate  {
         self.applePayClient?.tokenizeApplePay(payment) { [weak self] (nonce, error) in
             guard let self = self else { return }
             
+            let billingInformation = extractApplePayBillingInfo(from: payment)
+            os_log("Billing information: %{public}@", log: .default, type: .info, String(describing: billingInformation))
+
             if let nonce = nonce {
                 os_log("Tokenize Apple Pay payment succeeded", log: .default, type: .info)
-                self.completionBlock?(nonce, nil)
+                let result: [String: Any] = [
+                    "nonce": nonce,
+                    "billingInfo": billingInformation
+                ]
+                self.completionBlock?(result, nil)
                 completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
             } else if let error = error {
                 os_log("Tokenize Apple Pay payment failed with error: %{public}@", log: .default, type: .error, error.localizedDescription)
@@ -157,15 +196,9 @@ class ApplePayHandler: NSObject, PKPaymentAuthorizationViewControllerDelegate  {
         
         // If completion hasn't been called (e.g., user cancelled), call it now
         if !hasCalledCompletion {
-            self.callCompletion(nonce: nil, error: nil)
+            self.completionBlock?(nil, nil)
+            hasCalledCompletion = true
         }
-    }
-
-    private func callCompletion(nonce: BTPaymentMethodNonce?, error: Error?) {
-        guard !hasCalledCompletion else { return }
-        hasCalledCompletion = true
-        self.completionBlock?(nonce, error)
-        self.completionBlock = nil
     }
 
     func presentPaymentAuthorization(_ viewController: PKPaymentAuthorizationViewController) {

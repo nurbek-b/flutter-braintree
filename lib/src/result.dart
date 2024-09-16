@@ -27,16 +27,23 @@ class BraintreePaymentMethodNonce {
     required this.isDefault,
     this.paypalPayerId,
     this.deviceData,
+    this.billingInfo,
   });
 
   factory BraintreePaymentMethodNonce.fromJson(dynamic source) {
+    // Safely cast to Map<String, Object?> and ensure all keys are strings
+    final Map<String, Object?> data = (source as Map<Object?, Object?>)
+        .map((key, value) => MapEntry(key.toString(), value));
+
     return BraintreePaymentMethodNonce(
-      nonce: source['nonce'],
-      typeLabel: source['typeLabel'],
-      description: source['description'],
-      isDefault: source['isDefault'],
-      paypalPayerId: source['paypalPayerId'],
-      deviceData: source['deviceData'],
+      nonce: (data['nonce'] as String?) ?? '',
+      typeLabel: (data['typeLabel'] as String?) ?? '',
+      description: (data['description'] as String?) ?? '',
+      isDefault: data['isDefault'] == true,
+      paypalPayerId: data['paypalPayerId'] as String?,
+      deviceData: data['deviceData'] as String?,
+      billingInfo: (data['billingInfo'] as Map<Object?, Object?>)
+          .map((key, value) => MapEntry(key.toString(), value)),
     );
   }
 
@@ -58,4 +65,7 @@ class BraintreePaymentMethodNonce {
 
   /// String of device data.
   final String? deviceData;
+
+  /// Billing info for the payment method
+  final Map<String, dynamic>? billingInfo;
 }

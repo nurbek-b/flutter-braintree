@@ -64,36 +64,57 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         }
     }
     
-    private func handleResult(nonce: BTPaymentMethodNonce?, error: Error?, flutterResult: FlutterResult) {
+    private func handleResult(nonce: BTPaymentMethodNonce?, error: Error?, billingInfo: [String: Any]?, flutterResult: FlutterResult) {
         os_log("handleResult called.", log: OSLog.default, type: .info)
         if let error = error {
             os_log("handleResult error: %{public}@", log: OSLog.default, type: .error, error.localizedDescription)
             returnBraintreeError(result: flutterResult, error: error)
         } else if let nonce = nonce {
             os_log("handleResult nonce: %{public}@", log: OSLog.default, type: .info, nonce.nonce)
-            if let cardNonce = nonce as? BTCardNonce {
-                let threeDSecureInfo = cardNonce.threeDSecureInfo 
-                            os_log("3D Secure liability shift possible: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShiftPossible))
-                            os_log("3D Secure liability shifted: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShifted))
-                            
-                            let resultDict: [String: Any] = [
-                                "nonce": nonce.nonce,
-                                "isDefault": nonce.isDefault,
-                                "liabilityShiftPossible": threeDSecureInfo.liabilityShiftPossible,
-                                "liabilityShifted": threeDSecureInfo.liabilityShifted,
-                                "deviceData": self.deviceData as Any
-                            ]
-                        
-            }
-            // flutterResult(buildPaymentNonceDict(nonce: nonce))
-            let resultDict: [String: Any] = [
+            var resultDict: [String: Any] = [
                 "nonce": nonce.nonce,
                 "typeLabel": nonce.type,
                 "description": nonce.description,
                 "isDefault": nonce.isDefault,
                 "deviceData": self.deviceData as Any
             ]
-            flutterResult(resultDict)
+            
+            if let billingInfo = billingInfo {
+                resultDict["billingInfo"] = billingInfo
+            }
+            
+            // Handle 3D Secure for card nonces
+            if let cardNonce = nonce as? BTCardNonce {
+                let threeDSecureInfo = cardNonce.threeDSecureInfo 
+                os_log("3D Secure liability shift possible: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShiftPossible))
+                os_log("3D Secure liability shifted: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShifted))
+                
+                resultDict["liabilityShiftPossible"] = threeDSecureInfo.liabilityShiftPossible
+                resultDict["liabilityShifted"] = threeDSecureInfo.liabilityShifted
+            }
+            
+            // Ensure all values are of types that Flutter can handle
+            let sanitizedDict = resultDict.mapValues { value -> Any in
+                switch value {
+                case let stringValue as String:
+                    return stringValue
+                case let boolValue as Bool:
+                    return boolValue
+                case let intValue as Int:
+                    return intValue
+                case let doubleValue as Double:
+                    return doubleValue
+                case let dictValue as [String: Any]:
+                    return dictValue
+                case let arrayValue as [Any]:
+                    return arrayValue
+                default:
+                    return String(describing: value)
+                }
+            }
+            
+            print("Sanitized Result dictionary: \(sanitizedDict)")
+            flutterResult(sanitizedDict)
         } else {
             os_log("handleResult no nonce and no error.", log: OSLog.default, type: .info)
             flutterResult(nil)
@@ -146,7 +167,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                 } else {
                     os_log("PayPal tokenization: No nonce and no error.", log: OSLog.default, type: .error)
                 }
-                self.handleResult(nonce: nonce, error: error, flutterResult: result)
+                self.handleResult(nonce: nonce, error: error, billingInfo: nil, flutterResult: result)
                 self.isHandlingResult = false
             }
         } else {
@@ -163,7 +184,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                 } else {
                     os_log("PayPal tokenization (vault): No nonce and no error.", log: OSLog.default, type: .error)
                 }
-                self.handleResult(nonce: nonce, error: error, flutterResult: result)
+                self.handleResult(nonce: nonce, error: error, billingInfo: nil, flutterResult: result)
                 self.isHandlingResult = false
             }
         }
@@ -190,7 +211,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             os_log("handleCreditCardTokenization callback called.", log: OSLog.default, type: .info)
             if let error = error {
                 os_log("handleCreditCardTokenization error: %{public}@", log: OSLog.default, type: .error, error.localizedDescription)
-                self.handleResult(nonce: nil, error: error, flutterResult: result)
+                self.handleResult(nonce: nil, error: error, billingInfo: nil, flutterResult: result)
                 self.isHandlingResult = false
                 return
             }
@@ -202,7 +223,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
                 os_log("3D Secure liability shifted: %{public}@", log: OSLog.default, type: .info, String(threeDSecureInfo.liabilityShifted))
             }
 
-            self.handleResult(nonce: nonce, error: error, flutterResult: result)
+            self.handleResult(nonce: nonce, error: error, billingInfo: nil, flutterResult: result)
             self.isHandlingResult = false
         }
     }
@@ -256,7 +277,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             }
             let threeDSecureResult = paymentFlowResult as? BTThreeDSecureResult
             os_log("startThreeDSecureFlow callback BTThreeDSecureResult type called.", log: OSLog.default, type: .info)
-            self.handleResult(nonce: threeDSecureResult?.tokenizedCard, error: error, flutterResult: result)
+            self.handleResult(nonce: threeDSecureResult?.tokenizedCard, error: error, billingInfo: nil, flutterResult: result)
             self.isHandlingResult = false
         }
     }
@@ -285,7 +306,7 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             os_log("3D Secure lookup failed or returned no result.", log: OSLog.default, type: .error)
             let error = NSError(domain: "CardinalLookup", code: 0, userInfo: [NSLocalizedDescriptionKey: "3D Secure lookup failed or returned no result"])
             if let completion = self.completionBlock {
-                self.handleResult(nonce: nil, error: error, flutterResult: completion)
+                self.handleResult(nonce: nil, error: error, billingInfo: nil, flutterResult: completion)
             }
             self.isHandlingResult = false
         }
@@ -308,14 +329,17 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         
         self.applePayHandler?.presentingDelegate = self
         
-        self.applePayHandler?.completionBlock = { [weak self] (nonce, error) in
+        self.applePayHandler?.completionBlock = { [weak self] (applePayResult, error) in
             os_log("Apple Pay flow completed in FlutterBraintreeCustomPlugin", log: OSLog.default, type: .info)
         }
         
-        self.applePayHandler?.startApplePaymentFlow(paymentSummaryItems: paymentSummaryItemsData) { [weak self] (nonce, error) in
+        self.applePayHandler?.startApplePaymentFlow(paymentSummaryItems: paymentSummaryItemsData) {[weak self] (applePayResult, error) in
             os_log("Apple Pay flow finalisation", log: OSLog.default, type: .info)
+            
             if(self?.isHandlingResult ?? false) {
-                self?.handleResult(nonce: nonce, error: error, flutterResult: result)
+                let nonce = applePayResult?["nonce"] as? BTPaymentMethodNonce
+                let billingInfo = applePayResult?["billingInfo"] as? [String: Any]
+                self?.handleResult(nonce: nonce, error: error, billingInfo: billingInfo, flutterResult: result)
                 self?.isHandlingResult = false
             }
         }
