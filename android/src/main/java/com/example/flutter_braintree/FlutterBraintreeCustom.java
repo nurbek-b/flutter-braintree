@@ -84,7 +84,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                 payPalClient.setListener(this);
                 requestPaypalNonce();
             } else if (type.equals("startThreeDSecureFlow")) {
-                startThreeDSecureFlow();        
+                        startThreeDSecureFlow();        
             } else if (type.equals("startGooglePaymentFlow")) {
                 startGooglePaymentFlow();
             } else if (type.equals("checkGooglePayReady")) {
@@ -194,11 +194,28 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
             nonceMap.put("description", googlePayCardNonce.getEmail());
             nonceMap.put("lastTwo", googlePayCardNonce.getLastTwo());
         }
-        Intent result = new Intent();
-        result.putExtra("type", "paymentMethodNonce");
-        result.putExtra("paymentMethodNonce", nonceMap);
-        setResult(RESULT_OK, result);
-        finish();
+         dataCollector = new DataCollector(braintreeClient);
+            dataCollector.collectDeviceData(this, new DataCollectorCallback() {
+                @Override
+                public void onResult(@Nullable String deviceData, @Nullable Exception error) {
+                    if (error != null) {
+                        Log.e("FlutterBraintreeCustom", "Error collecting device data: " + error.getMessage());
+                        deviceData = null;
+                    } else {
+                        deviceData = deviceData;
+                        Log.d("FlutterBraintreeCustom", "Device data collected successfully");
+                    }
+
+                    Intent result = new Intent();
+                    result.putExtra("type", "paymentMethodNonce");
+                    result.putExtra("paymentMethodNonce", nonceMap);
+                    result.putExtra("deviceData", deviceData);
+                    result.putExtra("billingInfo", billingAddress);
+                    setResult(RESULT_OK, result);
+                    finish();
+                }
+            });
+
     }
 
     public void onCancel() {
@@ -308,17 +325,17 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         googlePayClient = new GooglePayClient(this, braintreeClient);
         googlePayClient.setListener(this);
 
-            GooglePayRequest googlePayRequest = new GooglePayRequest();
-            googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
-                .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
-                .setTotalPrice(totalPrice)
-                .setCurrencyCode("USD")
-                .build());
+        GooglePayRequest googlePayRequest = new GooglePayRequest();
+        googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
+            .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
+            .setTotalPrice(totalPrice)
+            .setCurrencyCode("USD")
+            .build());
 
         googlePayRequest.setBillingAddressRequired(true);
 
         googlePayClient.requestPayment(this, googlePayRequest);
-            
+
     };
     
 
@@ -345,7 +362,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                     }
                     finish();
                 });
-    }
+            }
 
     @Override
     public void onGooglePaySuccess(@NonNull PaymentMethodNonce paymentMethodNonce) {
