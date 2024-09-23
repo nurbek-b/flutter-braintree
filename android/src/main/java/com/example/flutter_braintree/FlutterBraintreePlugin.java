@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 
-
 import java.util.Map;
 import java.util.HashMap;
 
@@ -124,13 +123,18 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
             intent.putExtra("billingAddress", new HashMap<>(billingAddress));
 
             activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
-         } else if (call.method.equals("startGooglePaymentFlow")) {
+        } else if (call.method.equals("startGooglePaymentFlow")) {
             Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
             intent.putExtra("type", "startGooglePaymentFlow");
             intent.putExtra("authorization", (String) call.argument("authorization"));
             assert (call.argument("request") instanceof Map);
             Map request = (Map) call.argument("request");
             intent.putExtra("totalPrice", (String) request.get("totalPrice"));
+            activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
+        } else if (call.method.equals("checkGooglePayReady")) {
+            Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
+            intent.putExtra("type", "checkGooglePayReady");
+            intent.putExtra("authorization", (String) call.argument("authorization"));
             activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
         } else {
             result.notImplemented();
@@ -149,6 +153,8 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
                     String type = data.getStringExtra("type");
                     if (type.equals("paymentMethodNonce")) {
                         activeResult.success(data.getSerializableExtra("paymentMethodNonce"));
+                    } else if (type.equals("isReadyToPay")) {
+                        activeResult.success(data.getBooleanExtra("isReadyToPay", false));
                     } else {
                         Exception error = new Exception("Invalid activity result type.");
                         activeResult.error("error", error.getMessage(), null);

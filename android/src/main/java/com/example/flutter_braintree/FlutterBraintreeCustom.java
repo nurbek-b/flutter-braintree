@@ -46,6 +46,8 @@ import com.braintreepayments.api.GooglePayCardNonce;
 import com.google.android.gms.wallet.TransactionInfo;
 import com.google.android.gms.wallet.WalletConstants;
 
+import com.braintreepayments.api.DataCollector;
+import com.braintreepayments.api.DataCollectorCallback;
 
 import java.util.HashMap;
 import java.util.Arrays;
@@ -56,6 +58,8 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
     private Boolean started = false;
     private long creationTimestamp = -1;
     private GooglePayClient googlePayClient;
+    private DataCollector dataCollector;
+    private String deviceData;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,20 +73,39 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
             String returnUrlScheme = (getPackageName() + ".return.from.braintree").replace("_", "").toLowerCase();
             Log.d("FlutterBraintreeCustom", "returnUrlScheme = " + returnUrlScheme);
             braintreeClient = new BraintreeClient(this, intent.getStringExtra("authorization"), returnUrlScheme);
-            String type = intent.getStringExtra("type");
-            if (type.equals("tokenizeCreditCard")) {
-                tokenizeCreditCard();
-            } else if (type.equals("requestPaypalNonce")) {
-                payPalClient = new PayPalClient(this, braintreeClient);
-                payPalClient.setListener(this);
-                requestPaypalNonce();
-            } else if (type.equals("startThreeDSecureFlow")) {
-                startThreeDSecureFlow();        
-            } else if (type.equals("startGooglePaymentFlow")) {
-                startGooglePaymentFlow();
-            } else {
-                throw new Exception("Invalid request type: " + type);
-            }
+
+            dataCollector = new DataCollector(braintreeClient);
+            dataCollector.collectDeviceData(this, new DataCollectorCallback() {
+                @Override
+                public void onResult(@Nullable String deviceData, @Nullable Exception error) {
+                    if (error != null) {
+                        Log.e("FlutterBraintreeCustom", "Error collecting device data: " + error.getMessage());
+                        deviceData = null;
+                    } else {
+                        deviceData = deviceData;
+                        Log.d("FlutterBraintreeCustom", "Device data collected successfully");
+                    }
+
+                    String type = intent.getStringExtra("type");
+                    if (type.equals("tokenizeCreditCard")) {
+                        tokenizeCreditCard();
+                    } else if (type.equals("requestPaypalNonce")) {
+                        payPalClient = new PayPalClient(this, braintreeClient);
+                        payPalClient.setListener(this);
+                        requestPaypalNonce();
+                    } else if (type.equals("startThreeDSecureFlow")) {
+                        startThreeDSecureFlow();        
+                    } else if (type.equals("startGooglePaymentFlow")) {
+                        startGooglePaymentFlow();
+                    } else if (type.equals("checkGooglePayReady")) {
+                        checkGooglePayReady();
+                    } else {
+                        throw new Exception("Invalid request type: " + type);
+                    }
+                    
+                }
+            });
+            
         } catch (Exception e) {
             Intent result = new Intent();
             result.putExtra("error", e);
@@ -185,6 +208,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         Intent result = new Intent();
         result.putExtra("type", "paymentMethodNonce");
         result.putExtra("paymentMethodNonce", nonceMap);
+        result.putExtra("deviceData", deviceData);
         setResult(RESULT_OK, result);
         finish();
     }
@@ -270,13 +294,10 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                 if (threeDSecureResult != null) {
                     CardNonce cardNonce = threeDSecureResult.getTokenizedCard();
                     ThreeDSecureLookup lookup = threeDSecureResult.getLookup();
-                    System.out.println("ThreeDSecureLookup: " +
+                    Log.d("ThreeDSecureLookup", 
                             "version: " + lookup.getThreeDSecureVersion() +
                             ", acsUrl: " + lookup.getAcsUrl() +
-                            ", md: " + lookup.getMd() +
-                            // ", pareq: " + lookup.getPareq() +
-                            // ", termUrl: " + lookup.getTermUrl() +
-                        "");
+                            ", md: " + lookup.getMd());
 
                     // optional: inspect the lookup result and prepare UI if a challenge is required
                     threeDSecureClient.continuePerformVerification(FlutterBraintreeCustom.this, request, threeDSecureResult);
@@ -299,30 +320,55 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         googlePayClient = new GooglePayClient(this, braintreeClient);
         googlePayClient.setListener(this);
 
-        // ReadyForGooglePayRequest request = new ReadyForGooglePayRequest.Builder()
-        //         .setExistingPaymentMethodRequired(true)
-        //         .build();
-
-        //    googlePayClient.isReadyToPay(this, request, (isReadyToPay, error) -> {        
-            
-        googlePayClient.isReadyToPay(this, (isReadyToPay, error) -> {
-        if (isReadyToPay) {
-            GooglePayRequest googlePayRequest = new GooglePayRequest();
-            googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
-                .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
-                .setTotalPrice(totalPrice)
-                .setCurrencyCode("USD")
-                .build());
-
-        googlePayClient.requestPayment(this, googlePayRequest);
-            
-        }else{
-            onError(new Exception("Google Pay is not ready to pay."));
-        }
+ 
+        googlePayClient.isReadyToPay(this, (isReadyToPay, gpError) -> {
+            if (!isReadyToPay) {
+                onError(new Exception("Google Pay is not ready to pay."));
+                return;
+            }
+        });
+               
+        dataCollector.collectDeviceData(this, (deviceData, error) -> {
+            if (error != null) {
+                Log.e("FlutterBraintreeCustom", "Error collecting device data: " + error.getMessage());
+                onError(error);
+                return;
+            }
         });
 
+        GooglePayRequest googlePayRequest = new GooglePayRequest();
+        googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
+            .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
+            .setTotalPrice(totalPrice)
+            .setCurrencyCode("USD")
+            .build());
 
-        
+        googlePayClient.requestPayment(this, googlePayRequest);
+    }
+
+    // New method to check if Google Pay is ready
+    public void checkGooglePayReady() {
+
+        Log.d("FlutterBraintreeCustom", "checkGooglePayReady");
+        googlePayClient = new GooglePayClient(this, braintreeClient);
+        googlePayClient.setListener(this);
+
+        googlePayClient.isReadyToPay(this, (isReadyToPay, error) -> {
+            Intent result = new Intent();
+            if (isReadyToPay) {
+                result.putExtra("type", "isReadyToPay");
+                result.putExtra("isReadyToPay", true);
+                result.putExtra("deviceData", deviceData);
+                setResult(RESULT_OK, result);
+            } else {
+                result.putExtra("isReadyToPay", false);
+                if (error != null) {
+                    result.putExtra("error", error.getMessage());
+                }
+                setResult(RESULT_CANCELED, result);
+            }
+            finish();
+        });
     }
 
     @Override
@@ -341,6 +387,5 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         }
  
     }
-
 
 }

@@ -64,6 +64,18 @@ class Braintree {
     return BraintreePaymentMethodNonce.fromJson(result);
   }
 
+  /// Checks if Google Pay is ready for the given authorization.
+  ///
+  /// [authorization] must be either a valid client token or a valid tokenization key.
+  ///
+  /// Returns a [Future] that resolves to a [bool] indicating if Google Pay is ready.
+  static Future<bool> checkGooglePayReady(String authorization) async {
+    final result = await _kChannel.invokeMethod('checkGooglePayReady', {
+      'authorization': authorization,
+    });
+    return result;
+  }
+
   /// Initiates the Google Payment flow.
   ///
   /// [authorization] must be either a valid client token or a valid tokenization key.
@@ -81,6 +93,18 @@ class Braintree {
     if (result == null) return null;
     print(result);
     return BraintreePaymentMethodNonce.fromJson(result);
+  }
+
+  /// Checks if Apple Pay is ready for the given authorization.
+  ///
+  /// [authorization] must be either a valid client token or a valid tokenization key.
+  ///
+  /// Returns a [Future] that resolves to a [bool] indicating if Apple Pay is ready.
+  static Future<bool> checkApplePayReady(String authorization) async {
+    final result = await _kChannel.invokeMethod('checkApplePayReady', {
+      'authorization': authorization,
+    });
+    return result;
   }
 
   /// Initiates the Apple Payment flow.
