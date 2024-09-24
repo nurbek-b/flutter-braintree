@@ -6,6 +6,7 @@ import android.content.Intent;
 
 import java.util.Map;
 import java.util.HashMap;
+import android.util.Log;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
@@ -26,6 +27,7 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
     private FlutterBraintreeDropIn dropIn;
 
     public static void registerWith(Registrar registrar) {
+        Log.d("FlutterBraintreePlugin", "registerWith called");
         FlutterBraintreeDropIn.registerWith(registrar);
         final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_braintree.custom");
         FlutterBraintreePlugin plugin = new FlutterBraintreePlugin();
@@ -36,6 +38,7 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
 
     @Override
     public void onAttachedToEngine(FlutterPluginBinding binding) {
+        Log.d("FlutterBraintreePlugin", "onAttachedToEngine called");
         final MethodChannel channel = new MethodChannel(binding.getBinaryMessenger(), "flutter_braintree.custom");
         channel.setMethodCallHandler(this);
 
@@ -45,12 +48,14 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
 
     @Override
     public void onDetachedFromEngine(FlutterPluginBinding binding) {
+        Log.d("FlutterBraintreePlugin", "onDetachedFromEngine called");
         dropIn.onDetachedFromEngine(binding);
         dropIn = null;
     }
 
     @Override
     public void onAttachedToActivity(ActivityPluginBinding binding) {
+        Log.d("FlutterBraintreePlugin", "onAttachedToActivity called");
         activity = binding.getActivity();
         binding.addActivityResultListener(this);
         dropIn.onAttachedToActivity(binding);
@@ -58,12 +63,14 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
 
     @Override
     public void onDetachedFromActivityForConfigChanges() {
+        Log.d("FlutterBraintreePlugin", "onDetachedFromActivityForConfigChanges called");
         activity = null;
         dropIn.onDetachedFromActivity();
     }
 
     @Override
     public void onReattachedToActivityForConfigChanges(ActivityPluginBinding binding) {
+        Log.d("FlutterBraintreePlugin", "onReattachedToActivityForConfigChanges called");
         activity = binding.getActivity();
         binding.addActivityResultListener(this);
         dropIn.onReattachedToActivityForConfigChanges(binding);
@@ -71,12 +78,14 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
 
     @Override
     public void onDetachedFromActivity() {
+        Log.d("FlutterBraintreePlugin", "onDetachedFromActivity called");
         activity = null;
         dropIn.onDetachedFromActivity();
     }
 
     @Override
     public void onMethodCall(MethodCall call, Result result) {
+        Log.d("FlutterBraintreePlugin", "onMethodCall called with method: " + call.method);
         if (activeResult != null) {
             result.error("already_running", "Cannot launch another custom activity while one is already running.", null);
             return;
@@ -144,6 +153,7 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
 
     @Override
     public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.d("FlutterBraintreePlugin", "onActivityResult called with requestCode: " + requestCode + ", resultCode: " + resultCode);
         if (activeResult == null)
             return false;
 
@@ -160,7 +170,12 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
                         activeResult.error("error", error.getMessage(), null);
                     }
                 } else if (resultCode == Activity.RESULT_CANCELED) {
-                    activeResult.success(null);
+                    String error = data.getStringExtra("error");
+                    if (error != null) {
+                        activeResult.error("error", error, null);
+                    } else {
+                        activeResult.success(null);
+                    }
                 } else {
                     Exception error = (Exception) data.getSerializableExtra("error");
                     activeResult.error("error", error.getMessage(), null);

@@ -35,6 +35,8 @@ class BraintreePaymentMethodNonce {
     final Map<String, Object?> data = (source as Map<Object?, Object?>)
         .map((key, value) => MapEntry(key.toString(), value));
 
+    // Android billingInfo: [phoneNumber, streetAddress, surname, givenName, postalCode, locality, extendedAddress, region, countryCodeAlpha2]
+
     return BraintreePaymentMethodNonce(
       nonce: (data['nonce'] as String?) ?? '',
       typeLabel: (data['typeLabel'] as String?) ?? '',
@@ -42,8 +44,8 @@ class BraintreePaymentMethodNonce {
       isDefault: data['isDefault'] == true,
       paypalPayerId: data['paypalPayerId'] as String?,
       deviceData: data['deviceData'] as String?,
-      billingInfo: (data['billingInfo'] as Map<Object?, Object?>)
-          .map((key, value) => MapEntry(key.toString(), value)),
+      billingInfo: (data['billingInfo'] as Map<Object?, Object?>?)
+          ?.map((key, value) => MapEntry(key.toString(), value)),
     );
   }
 

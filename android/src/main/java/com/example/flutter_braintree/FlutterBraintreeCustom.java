@@ -45,6 +45,7 @@ import com.braintreepayments.api.GooglePayCardNonce;
 
 import com.google.android.gms.wallet.TransactionInfo;
 import com.google.android.gms.wallet.WalletConstants;
+import com.google.android.gms.wallet.WalletConstants.BillingAddressFormat;
 
 import com.braintreepayments.api.DataCollector;
 import com.braintreepayments.api.DataCollectorCallback;
@@ -52,6 +53,7 @@ import com.braintreepayments.api.PostalAddress;
 
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.List;
 
 public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalListener, GooglePayListener {
     private BraintreeClient braintreeClient;
@@ -67,16 +69,18 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
         super.onCreate(savedInstanceState);
 
         creationTimestamp = System.currentTimeMillis();
-
-        setContentView(R.layout.activity_flutter_braintree_custom);
+  
         try {
             Intent intent = getIntent();
             String returnUrlScheme = (getPackageName() + ".return.from.braintree").replace("_", "").toLowerCase();
             Log.d("FlutterBraintreeCustom", "returnUrlScheme = " + returnUrlScheme);
             braintreeClient = new BraintreeClient(this, intent.getStringExtra("authorization"), returnUrlScheme);
-            
+            googlePayClient = new GooglePayClient(this, braintreeClient);
+            googlePayClient.setListener(this);              
             
             String type = intent.getStringExtra("type");
+            setContentView(R.layout.activity_flutter_braintree_custom);
+
             if (type.equals("tokenizeCreditCard")) {
                 tokenizeCreditCard();
             } else if (type.equals("requestPaypalNonce")) {
@@ -106,6 +110,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
     @Override
     protected void onNewIntent(Intent newIntent) {
+        Log.d("FlutterBraintreeCustom", "onNewIntent");
         super.onNewIntent(newIntent);
         setIntent(newIntent);
     }
@@ -141,6 +146,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
             vaultRequest.setBillingAgreementDescription(intent.getStringExtra("billingAgreementDescription"));
             payPalClient.tokenizePayPalAccount(this, vaultRequest);
         } else {
+            Log.d("FlutterBraintreeCustom", "requestPaypalNonce Checkout flow");
             // Checkout flow
             PayPalCheckoutRequest checkOutRequest = new PayPalCheckoutRequest(intent.getStringExtra("amount"));
             checkOutRequest.setCurrencyCode(intent.getStringExtra("currencyCode"));
@@ -169,15 +175,17 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                     paymentIntent = PayPalPaymentIntent.AUTHORIZE;
             }
             checkOutRequest.setIntent(paymentIntent);
-
             payPalClient.tokenizePayPalAccount(this, checkOutRequest);
         }
     }
 
-    public void onPaymentMethodNonceCreated(PaymentMethodNonce paymentMethodNonce, ThreeDSecurePostalAddress billingAddress) {
+    public void onPaymentMethodNonceCreated(PaymentMethodNonce paymentMethodNonce, HashMap<String, String> billingAddress) {
+        Log.d("FlutterBraintreeCustom", "onPaymentMethodNonceCreated");
         HashMap<String, Object> nonceMap = new HashMap<String, Object>();
         nonceMap.put("nonce", paymentMethodNonce.getString());
         nonceMap.put("isDefault", paymentMethodNonce.isDefault());
+        nonceMap.put("billingInfo", billingAddress);
+        nonceMap.put("deviceData", deviceData);
         if (paymentMethodNonce instanceof PayPalAccountNonce) {
             PayPalAccountNonce paypalAccountNonce = (PayPalAccountNonce) paymentMethodNonce;
             nonceMap.put("paypalPayerId", paypalAccountNonce.getPayerId());
@@ -202,11 +210,15 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
     }
 
     public void onCancel() {
-        setResult(RESULT_CANCELED);
+        Log.d("FlutterBraintreeCustom", "onCancel");
+        Intent result = new Intent();
+        result.putExtra("error", new Exception("User canceled the operation"));
+        setResult(2, result);
         finish();
     }
 
     public void onError(Exception error) {
+        Log.d("FlutterBraintreeCustom", "onError");
         Intent result = new Intent();
         result.putExtra("error", error);
         setResult(2, result);
@@ -215,7 +227,8 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
     @Override
     public void onPayPalSuccess(@NonNull PayPalAccountNonce payPalAccountNonce) {
-        onPaymentMethodNonceCreated(payPalAccountNonce, createEmptyBillingAddress());
+        Log.d("FlutterBraintreeCustom", "onPayPalSuccess payPalAccountNonce = " + payPalAccountNonce.getString());
+        onPaymentMethodNonceCreated(payPalAccountNonce, fillBillingAddressFromNonce(payPalAccountNonce));
     }
 
     @Override
@@ -290,7 +303,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                     // optional: inspect the lookup result and prepare UI if a challenge is required
                     threeDSecureClient.continuePerformVerification(FlutterBraintreeCustom.this, request, threeDSecureResult);
 
-                    onPaymentMethodNonceCreated(cardNonce, billingAddress);
+                    onPaymentMethodNonceCreated(cardNonce, createEmptyBillingAddress());
                 } else {
                     Log.e("FlutterBraintreeCustom", "Error in 3D Secure flow", error);
                     onError(error);
@@ -303,101 +316,189 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
 
     private void startGooglePaymentFlow() {
         Intent intent = getIntent();
+        Log.d("FlutterBraintreeCustom", "startGooglePaymentFlow");
         String totalPrice = intent.getStringExtra("totalPrice");
-        
-        googlePayClient = new GooglePayClient(this, braintreeClient);
-        googlePayClient.setListener(this);
 
-            GooglePayRequest googlePayRequest = new GooglePayRequest();
-            googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
+        Log.d("FlutterBraintreeCustom", "startGooglePaymentFlow totalPrice = " + totalPrice);
+        Log.d("FlutterBraintreeCustom", "startGooglePaymentFlow googlePayClient = " + googlePayClient);
+
+        GooglePayRequest googlePayRequest = new GooglePayRequest();
+        googlePayRequest.setTransactionInfo(TransactionInfo.newBuilder()
                 .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
                 .setTotalPrice(totalPrice)
                 .setCurrencyCode("USD")
                 .build());
 
         googlePayRequest.setBillingAddressRequired(true);
+        googlePayRequest.setBillingAddressFormat(WalletConstants.BILLING_ADDRESS_FORMAT_FULL);
+        googlePayRequest.setPhoneNumberRequired(true);
 
-        googlePayClient.requestPayment(this, googlePayRequest);
+        Log.d("FlutterBraintreeCustom", "startGooglePaymentFlow googlePayRequest = " + googlePayRequest);
+        Log.d("FlutterBraintreeCustom", "startGooglePaymentFlow lifecycle = " + getLifecycle().getCurrentState());
+
+        try {
+
+            googlePayClient.isReadyToPay(this, (isReadyToPay, error) -> {
+                Intent result = new Intent();
+                Log.d("FlutterBraintreeCustom", "startGooglePaymentFlow isReadyToPay = " + isReadyToPay);
+                if (isReadyToPay) {
+
+                    googlePayClient.requestPayment(this, googlePayRequest);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e("FlutterBraintreeCustom", "startGooglePaymentFlow Error in Google Pay flow", e);
+            onError(e);
+        }
             
     };
     
 
-            // New method to check if Google Pay is ready
-            public void checkGooglePayReady() {
+    // New method to check if Google Pay is ready
+    public void checkGooglePayReady() {
 
-                Log.d("FlutterBraintreeCustom", "checkGooglePayReady");
-                googlePayClient = new GooglePayClient(this, braintreeClient);
-                googlePayClient.setListener(this);
-
-                googlePayClient.isReadyToPay(this, (isReadyToPay, error) -> {
-                    Intent result = new Intent();
-                    if (isReadyToPay) {
-                        result.putExtra("type", "isReadyToPay");
-                        result.putExtra("isReadyToPay", true);
-                        result.putExtra("deviceData", deviceData);
-                        setResult(RESULT_OK, result);
-                    } else {
-                        result.putExtra("isReadyToPay", false);
-                        if (error != null) {
-                            result.putExtra("error", error.getMessage());
-                        }
-                        setResult(RESULT_CANCELED, result);
-                    }
-                    finish();
-                });
+        Log.d("FlutterBraintreeCustom", "checkGooglePayReady");
+        googlePayClient.isReadyToPay(this, (isReadyToPay, error) -> {
+            Intent result = new Intent();
+            if (isReadyToPay) {
+                if (error != null) {
+                    result.putExtra("error", error.getMessage());
+                    setResult(RESULT_CANCELED, result);
+                } else {
+                    result.putExtra("type", "isReadyToPay");
+                    result.putExtra("isReadyToPay", isReadyToPay);
+                    setResult(RESULT_OK, result);                            
+                }
+            }
+            finish();
+        });
     }
 
     @Override
     public void onGooglePaySuccess(@NonNull PaymentMethodNonce paymentMethodNonce) {
-        Log.d("onGooglePaySuccess", "paymentMethodNonce = " + paymentMethodNonce.getString());
+        Log.d("FlutterBraintreeCustom", "onGooglePaySuccess paymentMethodNonce = " + paymentMethodNonce.getString());
         onPaymentMethodNonceCreated(paymentMethodNonce, fillBillingAddressFromNonce(paymentMethodNonce));
     }
 
     @Override
     public void onGooglePayFailure(@NonNull Exception error) {
+        Log.e("FlutterBraintreeCustom", "onGooglePayFailure Error in Google Pay flow", error);
         if (error instanceof UserCanceledException) {
             onCancel() ;
-        // user canceled
         } else {
-        onError(error);
+            onError(error);
         }
- 
+    }
+    private HashMap<String, String> createEmptyBillingAddress() {
+        HashMap<String, String> billingAddressMap = new HashMap<>();
+        billingAddressMap.put("givenName", "");
+        billingAddressMap.put("surname", "");
+        billingAddressMap.put("phoneNumber", "");
+        billingAddressMap.put("streetAddress", "");
+        billingAddressMap.put("extendedAddress", "");
+        billingAddressMap.put("locality", "");
+        billingAddressMap.put("region", "");
+        billingAddressMap.put("postalCode", "");
+        billingAddressMap.put("countryCodeAlpha2", "");
+        return billingAddressMap;
     }
 
-    private ThreeDSecurePostalAddress createEmptyBillingAddress() {
-        ThreeDSecurePostalAddress billingAddress = new ThreeDSecurePostalAddress();
-        billingAddress.setGivenName("");
-        billingAddress.setSurname("");
-        billingAddress.setPhoneNumber("");
-        billingAddress.setStreetAddress("");
-        billingAddress.setExtendedAddress("");
-        billingAddress.setLocality("");
-        billingAddress.setRegion("");
-        billingAddress.setPostalCode("");
-        billingAddress.setCountryCodeAlpha2("");
-        return billingAddress;
-    }
-
-    private ThreeDSecurePostalAddress fillBillingAddressFromNonce(PaymentMethodNonce paymentMethodNonce) {
-        ThreeDSecurePostalAddress billingAddress = createEmptyBillingAddress();
+    private HashMap<String, String> fillBillingAddressFromNonce(PaymentMethodNonce paymentMethodNonce) {
+        HashMap<String, String> billingAddressMap = createEmptyBillingAddress();
         
         if (paymentMethodNonce instanceof GooglePayCardNonce) {
             GooglePayCardNonce googlePayCardNonce = (GooglePayCardNonce) paymentMethodNonce;
             PostalAddress googlePayBillingAddress = googlePayCardNonce.getBillingAddress();
             
             if (googlePayBillingAddress != null) {
-                billingAddress.setGivenName(googlePayBillingAddress.getRecipientName());
-                billingAddress.setPhoneNumber(googlePayBillingAddress.getPhoneNumber());
-                billingAddress.setStreetAddress(googlePayBillingAddress.getStreetAddress());
-                billingAddress.setExtendedAddress(googlePayBillingAddress.getExtendedAddress());
-                billingAddress.setLocality(googlePayBillingAddress.getLocality());
-                billingAddress.setRegion(googlePayBillingAddress.getRegion());
-                billingAddress.setPostalCode(googlePayBillingAddress.getPostalCode());
-                billingAddress.setCountryCodeAlpha2(googlePayBillingAddress.getCountryCodeAlpha2());
+                billingAddressMap.put("givenName", googlePayBillingAddress.getRecipientName());
+                billingAddressMap.put("phoneNumber", googlePayBillingAddress.getPhoneNumber());
+                billingAddressMap.put("streetAddress", googlePayBillingAddress.getStreetAddress());
+                billingAddressMap.put("extendedAddress", googlePayBillingAddress.getExtendedAddress());
+                billingAddressMap.put("locality", googlePayBillingAddress.getLocality());
+                billingAddressMap.put("region", googlePayBillingAddress.getRegion());
+                billingAddressMap.put("postalCode", googlePayBillingAddress.getPostalCode());
+                billingAddressMap.put("countryCodeAlpha2", googlePayBillingAddress.getCountryCodeAlpha2());
+            }
+        }
+
+        if (paymentMethodNonce instanceof PayPalAccountNonce){
+
+
+            
+            PayPalAccountNonce paypalNonce = (PayPalAccountNonce) paymentMethodNonce;
+            PostalAddress paypalBillingAddress = paypalNonce.getBillingAddress();
+            Log.d("FlutterBraintreeCustom", convertPayPalNonceToString(paypalNonce));
+                        
+            if (paypalBillingAddress != null) {
+                billingAddressMap.put("givenName", paypalBillingAddress.getRecipientName());
+                billingAddressMap.put("phoneNumber", paypalBillingAddress.getPhoneNumber());
+                billingAddressMap.put("streetAddress", paypalBillingAddress.getStreetAddress());
+                billingAddressMap.put("extendedAddress", paypalBillingAddress.getExtendedAddress());
+                billingAddressMap.put("locality", paypalBillingAddress.getLocality());
+                billingAddressMap.put("region", paypalBillingAddress.getRegion());
+                billingAddressMap.put("postalCode", paypalBillingAddress.getPostalCode());
+                billingAddressMap.put("countryCodeAlpha2", paypalBillingAddress.getCountryCodeAlpha2());
             }
         }
         
-        return billingAddress;
+        // Log the billing address
+        Log.d("FlutterBraintreeCustom", "fillBillingAddressFromNonceMap");
+        Log.d("FlutterBraintreeCustom", "Given Name: " + billingAddressMap.get("givenName"));
+        Log.d("FlutterBraintreeCustom", "Phone Number: " + billingAddressMap.get("phoneNumber"));
+        Log.d("FlutterBraintreeCustom", "Street Address: " + billingAddressMap.get("streetAddress"));
+        Log.d("FlutterBraintreeCustom", "Extended Address: " + billingAddressMap.get("extendedAddress"));
+        Log.d("FlutterBraintreeCustom", "Locality: " + billingAddressMap.get("locality"));
+        Log.d("FlutterBraintreeCustom", "Region: " + billingAddressMap.get("region"));
+        Log.d("FlutterBraintreeCustom", "Postal Code: " + billingAddressMap.get("postalCode"));
+        Log.d("FlutterBraintreeCustom", "Country Code Alpha2: " + billingAddressMap.get("countryCodeAlpha2"));
+
+        return billingAddressMap;
     }
 
+    @Override
+    protected void onDestroy() {
+        Log.d("FlutterBraintreeCustom", "onDestroy");
+        super.onDestroy();
+        // Ensure proper cleanup of the GooglePayClient or any other resources
+        googlePayClient = null;
+        braintreeClient = null;
+        payPalClient = null;
+        dataCollector = null;        
+    }
+
+    private static String convertPayPalNonceToString(PayPalAccountNonce nonce) {
+    return "First Name: " + nonce.getFirstName() + "\n" +
+        "Last Name: " + nonce.getLastName() + "\n" +
+        "Email: " + nonce.getEmail() + "\n" +
+        "Phone: " + nonce.getPhone() + "\n" +
+        "Payer ID: " + nonce.getPayerId() + "\n" +
+        "Client Metadata ID: " + nonce.getClientMetadataId() + "\n" +
+        "Billing Address: " + formatPayPalAddress(nonce.getBillingAddress()) + "\n" +
+        "Shipping Address: " + formatPayPalAddress(nonce.getShippingAddress());
+    }
+    private static String formatPayPalAddress(PostalAddress address) {
+        String addressString = "";
+        List<String> addresses = Arrays.asList(
+                address.getRecipientName(),
+                address.getStreetAddress(),
+                address.getExtendedAddress(),
+                address.getLocality(),
+                address.getRegion(),
+                address.getPostalCode(),
+                address.getCountryCodeAlpha2()
+        );
+
+        for (String line : addresses) {
+            if (line == null) {
+                addressString += "null";
+            } else {
+                addressString += line;
+            }
+            addressString += " ";
+        }
+
+        return addressString;
+    }
 }
