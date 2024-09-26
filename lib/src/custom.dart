@@ -70,11 +70,10 @@ class Braintree {
   ///
   /// Returns a [Future] that resolves to a [bool] indicating if Google Pay is ready.
   static Future<bool> checkGooglePayReady(String authorization) async {
-    return true;
-    // final result = await _kChannel.invokeMethod('checkGooglePayReady', {
-    //   'authorization': authorization,
-    // });
-    // return result;
+    final result = await _kChannel.invokeMethod('checkGooglePayReady', {
+      'authorization': authorization,
+    });
+    return result;
   }
 
   /// Initiates the Google Payment flow.
