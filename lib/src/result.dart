@@ -1,3 +1,5 @@
+import 'dart:io';
+
 class BraintreeDropInResult {
   const BraintreeDropInResult({
     required this.paymentMethodNonce,
@@ -36,6 +38,37 @@ class BraintreePaymentMethodNonce {
         .map((key, value) => MapEntry(key.toString(), value));
 
     // Android billingInfo: [phoneNumber, streetAddress, surname, givenName, postalCode, locality, extendedAddress, region, countryCodeAlpha2]
+    // IOS billingInfo: [address: {street, city, postalCode, state, country}, name]
+
+    Map<String, dynamic> resultBillingInfo = {};
+    if (Platform.isAndroid) {
+      resultBillingInfo = ((data['billingInfo'] as Map<Object?, Object?>?)
+              ?.map((key, value) => MapEntry(key.toString(), value))) ??
+          {};
+    } else if (Platform.isIOS) {
+      final iosInfo = ((data['billingInfo'] as Map<Object?, Object?>?)
+          ?.map((key, value) => MapEntry(key.toString(), value)));
+      if (((iosInfo?['name'] as String?) ?? '').isNotEmpty) {
+        resultBillingInfo = {};
+        final nameParts = (iosInfo?['name'] as String?)?.split(' ') ?? [];
+        resultBillingInfo['givenName'] = nameParts.firstOrNull;
+        if (nameParts.length > 1) {
+          resultBillingInfo['surname'] =
+              nameParts.getRange(1, nameParts.length).join(' ');
+        }
+      }
+      if (iosInfo?['address'] != null) {
+        final iosAddress = (iosInfo?['address'] as Map<Object?, Object?>?)
+            ?.map((key, value) => MapEntry(key.toString(), value));
+        resultBillingInfo['locality'] = iosAddress?['city'];
+        resultBillingInfo['region'] = iosAddress?['state'];
+        resultBillingInfo['postalCode'] = iosAddress?['postalCode'];
+        resultBillingInfo['countryCodeAlpha2'] = iosAddress?['country'];
+        resultBillingInfo['streetAddress'] = iosAddress?['street'];
+      }
+    } else {
+      resultBillingInfo = {};
+    }
 
     return BraintreePaymentMethodNonce(
       nonce: (data['nonce'] as String?) ?? '',
@@ -44,8 +77,7 @@ class BraintreePaymentMethodNonce {
       isDefault: data['isDefault'] == true,
       paypalPayerId: data['paypalPayerId'] as String?,
       deviceData: data['deviceData'] as String?,
-      billingInfo: (data['billingInfo'] as Map<Object?, Object?>?)
-          ?.map((key, value) => MapEntry(key.toString(), value)),
+      billingInfo: resultBillingInfo,
     );
   }
 

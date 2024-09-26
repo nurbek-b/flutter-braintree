@@ -56,6 +56,8 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
             handleCreditCardTokenization(call: call, client: client!, result: result)
         case "startThreeDSecureFlow":
             startThreeDSecureFlow(call: call, client: client!, result: result)
+        case "checkApplePayReady":
+            checkApplePayAvailability(call: call, client: client!, result: result)
         case "startApplePaymentFlow":
             startApplePaymentFlow(call: call, client: client!, result: result)
         default:
@@ -345,9 +347,10 @@ public class FlutterBraintreeCustomPlugin: BaseFlutterBraintreePlugin, FlutterPl
         }
     }
 
-    private func checkApplePayAvailability(result: @escaping FlutterResult) {
+    private func checkApplePayAvailability(call: FlutterMethodCall, client: BTAPIClient, result: @escaping FlutterResult) {
         let canMakePayments = ApplePayHandler.canMakePayments()
         result(canMakePayments)
+        self.isHandlingResult = false
     }
 
     // BTViewControllerPresentingDelegate

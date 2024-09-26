@@ -214,11 +214,12 @@ public class FlutterBraintreeCustom extends AppCompatActivity implements PayPalL
                         Log.d("FlutterBraintreeCustom", "Device data collected successfully");
                     }
 
+                    nonceMap.put("deviceData", deviceData);
+                    nonceMap.put("billingInfo", billingAddress);                    
+
                     Intent result = new Intent();
                     result.putExtra("type", "paymentMethodNonce");
                     result.putExtra("paymentMethodNonce", nonceMap);
-                    result.putExtra("deviceData", deviceData);
-                    result.putExtra("billingInfo", billingAddress);
                     setResult(RESULT_OK, result);
                     finish();
                 }
