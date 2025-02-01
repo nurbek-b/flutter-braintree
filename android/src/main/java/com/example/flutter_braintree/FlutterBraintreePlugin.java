@@ -23,6 +23,7 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
 
     private Activity activity;
     private Result activeResult;
+    private String currentMethod = "";
 
     private FlutterBraintreeDropIn dropIn;
 
@@ -91,98 +92,134 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
             return;
         }
         activeResult = result;
+        currentMethod = call.method; 
 
-        if (call.method.equals("tokenizeCreditCard")) {
-            Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
-            intent.putExtra("type", "tokenizeCreditCard");
-            intent.putExtra("authorization", (String) call.argument("authorization"));
-            assert (call.argument("request") instanceof Map);
-            Map request = (Map) call.argument("request");
-            intent.putExtra("cardNumber", (String) request.get("cardNumber"));
-            intent.putExtra("expirationMonth", (String) request.get("expirationMonth"));
-            intent.putExtra("expirationYear", (String) request.get("expirationYear"));
-            intent.putExtra("cvv", (String) request.get("cvv"));
-            intent.putExtra("cardholderName", (String) request.get("cardholderName"));
-            activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
-        } else if (call.method.equals("requestPaypalNonce")) {
-            Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
-            intent.putExtra("type", "requestPaypalNonce");
-            intent.putExtra("authorization", (String) call.argument("authorization"));
-            assert (call.argument("request") instanceof Map);
-            Map request = (Map) call.argument("request");
-            intent.putExtra("amount", (String) request.get("amount"));
-            intent.putExtra("currencyCode", (String) request.get("currencyCode"));
-            intent.putExtra("displayName", (String) request.get("displayName"));
-            intent.putExtra("payPalPaymentIntent", (String) request.get("payPalPaymentIntent"));
-            intent.putExtra("payPalPaymentUserAction", (String) request.get("payPalPaymentUserAction"));
-            intent.putExtra("billingAgreementDescription", (String) request.get("billingAgreementDescription"));
-            activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
-        } else if (call.method.equals("startThreeDSecureFlow")) {
-            Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
-            intent.putExtra("type", "startThreeDSecureFlow");
-            intent.putExtra("authorization", (String) call.argument("authorization"));
-            assert (call.argument("request") instanceof Map);
-            Map request = (Map) call.argument("request");
-            intent.putExtra("nonce", (String) request.get("nonce"));
-            intent.putExtra("amount", (String) request.get("amount"));
-            intent.putExtra("email", (String) request.get("email"));
-            intent.putExtra("surname", (String) request.get("surname"));
-            intent.putExtra("givenName", (String) request.get("givenName"));
-            Map billingAddress = (Map) request.get("billingAddress");
-            intent.putExtra("billingAddress", new HashMap<>(billingAddress));
-
-            activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
-        } else if (call.method.equals("startGooglePaymentFlow")) {
-            Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
-            intent.putExtra("type", "startGooglePaymentFlow");
-            intent.putExtra("authorization", (String) call.argument("authorization"));
-            assert (call.argument("request") instanceof Map);
-            Map request = (Map) call.argument("request");
-            intent.putExtra("totalPrice", (String) request.get("totalPrice"));
-            activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
-        } else if (call.method.equals("checkGooglePayReady")) {
-            Intent intent = new Intent(activity, FlutterBraintreeCustom.class);
-            intent.putExtra("type", "checkGooglePayReady");
-            intent.putExtra("authorization", (String) call.argument("authorization"));
-            activity.startActivityForResult(intent, CUSTOM_ACTIVITY_REQUEST_CODE);
-        } else {
-            result.notImplemented();
-            activeResult = null;
+        switch (call.method) {
+            case "tokenizeCreditCard":
+                Intent tokenizeCreditCardIntent = new Intent(activity, FlutterBraintreeCustom.class);
+                tokenizeCreditCardIntent.putExtra("type", "tokenizeCreditCard");
+                tokenizeCreditCardIntent.putExtra("authorization", (String) call.argument("authorization"));
+                assert (call.argument("request") instanceof Map);
+                Map tokenizeCreditCardRequest = (Map) call.argument("request");
+                tokenizeCreditCardIntent.putExtra("cardNumber", (String) tokenizeCreditCardRequest.get("cardNumber"));
+                tokenizeCreditCardIntent.putExtra("expirationMonth", (String) tokenizeCreditCardRequest.get("expirationMonth"));
+                tokenizeCreditCardIntent.putExtra("expirationYear", (String) tokenizeCreditCardRequest.get("expirationYear"));
+                tokenizeCreditCardIntent.putExtra("cvv", (String) tokenizeCreditCardRequest.get("cvv"));
+                tokenizeCreditCardIntent.putExtra("cardholderName", (String) tokenizeCreditCardRequest.get("cardholderName"));
+                activity.startActivityForResult(tokenizeCreditCardIntent, CUSTOM_ACTIVITY_REQUEST_CODE);
+                break;
+            case "requestPaypalNonce":
+                Intent requestPaypalNonceIntent = new Intent(activity, FlutterBraintreeCustom.class);
+                requestPaypalNonceIntent.putExtra("type", "requestPaypalNonce");
+                requestPaypalNonceIntent.putExtra("authorization", (String) call.argument("authorization"));
+                assert (call.argument("request") instanceof Map);
+                Map requestPaypalNonceRequest = (Map) call.argument("request");
+                requestPaypalNonceIntent.putExtra("amount", (String) requestPaypalNonceRequest.get("amount"));
+                requestPaypalNonceIntent.putExtra("currencyCode", (String) requestPaypalNonceRequest.get("currencyCode"));
+                requestPaypalNonceIntent.putExtra("displayName", (String) requestPaypalNonceRequest.get("displayName"));
+                requestPaypalNonceIntent.putExtra("payPalPaymentIntent", (String) requestPaypalNonceRequest.get("payPalPaymentIntent"));
+                requestPaypalNonceIntent.putExtra("payPalPaymentUserAction", (String) requestPaypalNonceRequest.get("payPalPaymentUserAction"));
+                requestPaypalNonceIntent.putExtra("billingAgreementDescription", (String) requestPaypalNonceRequest.get("billingAgreementDescription"));
+                activity.startActivityForResult(requestPaypalNonceIntent, CUSTOM_ACTIVITY_REQUEST_CODE);
+                break;
+            case "startThreeDSecureFlow":
+                Intent startThreeDSecureFlowIntent = new Intent(activity, FlutterBraintreeCustom.class);
+                startThreeDSecureFlowIntent.putExtra("type", "startThreeDSecureFlow");
+                startThreeDSecureFlowIntent.putExtra("authorization", (String) call.argument("authorization"));
+                assert (call.argument("request") instanceof Map);
+                Map startThreeDSecureFlowRequest = (Map) call.argument("request");
+                startThreeDSecureFlowIntent.putExtra("nonce", (String) startThreeDSecureFlowRequest.get("nonce"));
+                startThreeDSecureFlowIntent.putExtra("amount", (String) startThreeDSecureFlowRequest.get("amount"));
+                startThreeDSecureFlowIntent.putExtra("email", (String) startThreeDSecureFlowRequest.get("email"));
+                startThreeDSecureFlowIntent.putExtra("surname", (String) startThreeDSecureFlowRequest.get("surname"));
+                startThreeDSecureFlowIntent.putExtra("givenName", (String) startThreeDSecureFlowRequest.get("givenName"));
+                Map billingAddress = (Map) startThreeDSecureFlowRequest.get("billingAddress");
+                startThreeDSecureFlowIntent.putExtra("billingAddress", new HashMap<>(billingAddress));
+                activity.startActivityForResult(startThreeDSecureFlowIntent, CUSTOM_ACTIVITY_REQUEST_CODE);
+                break;
+            case "startGooglePaymentFlow":
+                Intent startGooglePaymentFlowIntent = new Intent(activity, FlutterBraintreeCustom.class);
+                startGooglePaymentFlowIntent.putExtra("type", "startGooglePaymentFlow");
+                startGooglePaymentFlowIntent.putExtra("authorization", (String) call.argument("authorization"));
+                assert (call.argument("request") instanceof Map);
+                Map startGooglePaymentFlowRequest = (Map) call.argument("request");
+                startGooglePaymentFlowIntent.putExtra("totalPrice", (String) startGooglePaymentFlowRequest.get("totalPrice"));
+                activity.startActivityForResult(startGooglePaymentFlowIntent, CUSTOM_ACTIVITY_REQUEST_CODE);
+                break;
+            case "checkGooglePayReady":
+                Intent checkGooglePayReadyIntent = new Intent(activity, FlutterBraintreeCustom.class);
+                checkGooglePayReadyIntent.putExtra("type", "checkGooglePayReady");
+                checkGooglePayReadyIntent.putExtra("authorization", (String) call.argument("authorization"));
+                activity.startActivityForResult(checkGooglePayReadyIntent, CUSTOM_ACTIVITY_REQUEST_CODE);
+                break;
+            default:
+                result.notImplemented();
+                activeResult = null;
+                break;
         }
     }
 
     @Override
     public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (currentMethod == null) {
+            currentMethod = "undefined";
+        }
+
         Log.d("FlutterBraintreePlugin", "onActivityResult called with requestCode: " + requestCode + ", resultCode: " + resultCode);
-        if (activeResult == null)
+
+        if (activeResult == null) {
+            Log.w("FlutterBraintreePlugin", "activeResult is null, cannot handle activity result");
             return false;
+        }
+
+        if (data == null) {
+            Log.w("FlutterBraintreePlugin", "Intent data is null");
+            activeResult.error("error", "Intent data is null in method: " + currentMethod, null);
+            activeResult = null;
+            return true;
+        }
 
         switch (requestCode) {
             case CUSTOM_ACTIVITY_REQUEST_CODE:
                 if (resultCode == Activity.RESULT_OK) {
                     String type = data.getStringExtra("type");
-                    if (type.equals("paymentMethodNonce")) {
+                    if (type == null) {
+                        Log.w("FlutterBraintreePlugin", "Type is null in Intent data");
+                        activeResult.error("error", "Type is null in method: " + currentMethod, null);
+                    } else if (type.equals("paymentMethodNonce")) {
+                        Log.d("FlutterBraintreePlugin", "Received paymentMethodNonce");
                         activeResult.success(data.getSerializableExtra("paymentMethodNonce"));
                     } else if (type.equals("isReadyToPay")) {
+                        Log.d("FlutterBraintreePlugin", "Received isReadyToPay");
                         activeResult.success(data.getBooleanExtra("isReadyToPay", false));
                     } else {
+                        Log.w("FlutterBraintreePlugin", "Invalid activity result type: " + type);
                         Exception error = new Exception("Invalid activity result type.");
-                        activeResult.error("error", error.getMessage(), null);
+                        activeResult.error("error", error.getMessage() + " in method: " + currentMethod, null);
                     }
                 } else if (resultCode == Activity.RESULT_CANCELED) {
                     String error = data.getStringExtra("error");
                     if (error != null) {
-                        activeResult.error("error", error, null);
+                        Log.w("FlutterBraintreePlugin", "Activity canceled with error: " + error);
+                        activeResult.error("error", error + " in method: " + currentMethod, null);
                     } else {
+                        Log.d("FlutterBraintreePlugin", "Activity canceled without error");
                         activeResult.success(null);
                     }
                 } else {
                     Exception error = (Exception) data.getSerializableExtra("error");
-                    activeResult.error("error", error.getMessage(), null);
+                    if (error != null) {
+                        Log.w("FlutterBraintreePlugin", "Activity failed with error: " + error.getMessage());
+                        activeResult.error("error", error.getMessage() + " in method: " + currentMethod, null);
+                    } else {
+                        Log.w("FlutterBraintreePlugin", "Activity failed with unknown error");
+                        activeResult.error("error", "Unknown error in method: " + currentMethod, null);
+                    }
                 }
                 activeResult = null;
                 return true;
             default:
+                Log.w("FlutterBraintreePlugin", "Unhandled requestCode: " + requestCode);
                 return false;
         }
     }
