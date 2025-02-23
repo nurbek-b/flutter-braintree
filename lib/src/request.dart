@@ -199,6 +199,7 @@ class BraintreePayPalRequest {
     this.billingAgreementDescription,
     this.payPalPaymentIntent = PayPalPaymentIntent.authorize,
     this.payPalPaymentUserAction = PayPalPaymentUserAction.default_,
+    this.returnUrl,
   });
 
   /// Amount of the transaction. If [amount] is `null`, PayPal will use the billing agreement (Vault) flow.
@@ -221,6 +222,10 @@ class BraintreePayPalRequest {
   /// for additional documentation.
   PayPalPaymentUserAction payPalPaymentUserAction;
 
+  /// The deep link URL to redirect to the user withing app after the PayPal flow is completed.
+  /// should be set for android.
+  final String? returnUrl;
+
   /// Converts this request object into a JSON-encodable format.
   Map<String, dynamic> toJson() => {
         if (amount != null) 'amount': amount,
@@ -230,6 +235,7 @@ class BraintreePayPalRequest {
           'billingAgreementDescription': billingAgreementDescription,
         'payPalPaymentIntent': payPalPaymentIntent.name,
         'payPalPaymentUserAction': payPalPaymentUserAction.name,
+        if (returnUrl != null) 'returnUrl': returnUrl,
       };
 }
 

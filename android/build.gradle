@@ -5,18 +5,18 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        jcenter()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.0'
+        classpath 'com.android.tools.build:gradle:8.1.4'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10'
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
         maven {
             url "https://cardinalcommerceprod.jfrog.io/artifactory/android"
             credentials {
@@ -28,6 +28,7 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
     compileSdk = flutter.compileSdkVersion
@@ -46,20 +47,30 @@ android {
         disable 'InvalidPackage'
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }  
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 }
 
 dependencies {
-    implementation 'com.braintreepayments.api:drop-in:6.16.0'
-    implementation 'com.braintreepayments.api:three-d-secure:4.45.0'
-    implementation 'com.braintreepayments.api:google-pay:4.45.0'
-    implementation 'com.google.android.gms:play-services-wallet:18.1.3'
-    implementation 'androidx.appcompat:appcompat:1.4.0-alpha03'
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
-    implementation 'androidx.activity:activity:1.2.3'
-    implementation 'androidx.fragment:fragment:1.3.4'
+    implementation 'com.braintreepayments.api:braintree:5.6.0'
+    implementation 'com.braintreepayments.api:data-collector:5.6.0'
+    implementation 'com.braintreepayments.api:card:5.6.0'
+    implementation 'com.braintreepayments.api:paypal:5.6.0'
+    implementation 'com.braintreepayments.api:google-pay:5.6.0'
+    implementation 'com.braintreepayments.api:three-d-secure:5.6.0'
+
+    implementation 'com.google.android.gms:play-services-wallet:19.2.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.activity:activity:1.8.2'
+    implementation 'androidx.fragment:fragment:1.6.2'
+    
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10'
 
     components.all {
         allVariants {

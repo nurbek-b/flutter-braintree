@@ -16,6 +16,7 @@ import android.content.Intent;
 
 import androidx.annotation.Nullable;
 
+import com.braintreepayments.api.DropInListener;
 import com.braintreepayments.api.DropInRequest;
 import com.braintreepayments.api.DropInResult;
 import com.braintreepayments.api.GooglePayRequest;
@@ -30,18 +31,18 @@ import com.google.android.gms.wallet.WalletConstants;
 import java.io.Serializable;
 import java.util.HashMap;
 
-public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, MethodCallHandler, ActivityResultListener, Serializable {
+public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, MethodCallHandler, DropInListener, Serializable {
   private static final int DROP_IN_REQUEST_CODE = 0x1337;
 
   private Activity activity;
   private Result activeResult;
 
+  private DropInClient dropInClient;
 
   public static void registerWith(Registrar registrar) {
     final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_braintree.drop_in");
     FlutterBraintreeDropIn plugin = new FlutterBraintreeDropIn();
     plugin.activity = registrar.activity();
-    registrar.addActivityResultListener(plugin);
     channel.setMethodCallHandler(plugin);
   }
 
@@ -59,7 +60,6 @@ public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, Me
   @Override
   public void onAttachedToActivity(ActivityPluginBinding binding) {
     activity = binding.getActivity();
-    binding.addActivityResultListener(this);
   }
 
   @Override
@@ -70,7 +70,6 @@ public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, Me
   @Override
   public void onReattachedToActivityForConfigChanges(ActivityPluginBinding binding) {
     activity = binding.getActivity();
-    binding.addActivityResultListener(this);
   }
 
   @Override
@@ -128,9 +127,6 @@ public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, Me
       dropInRequest.setMaskCardNumber((Boolean) call.argument("maskCardNumber"));
 
 
-      //.collectDeviceData((Boolean) call.argument("collectDeviceData"))
-      // .requestThreeDSecureVerification((Boolean) call.argument("requestThreeDSecureVerification"))
-
       readGooglePaymentParameters(dropInRequest, call);
       readPayPalParameters(dropInRequest, call);
       if (!((Boolean) call.argument("venmoEnabled")))
@@ -145,13 +141,51 @@ public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, Me
         return;
       }
       this.activeResult = result;
-      Intent intent = new Intent(activity, DropInActivity.class);
-      intent.putExtra("token", token);
-      intent.putExtra("dropInRequest", dropInRequest);
-      this.activity.startActivityForResult(intent, DROP_IN_REQUEST_CODE);
+
+      // Intent intent = new Intent(activity, DropInActivity.class);
+      // intent.putExtra("token", token);
+      // intent.putExtra("dropInRequest", dropInRequest);
+      // this.activity.startActivityForResult(intent, DROP_IN_REQUEST_CODE);
+
+      dropInClient = new DropInClient(activity, token);
+      dropInClient.setListener(this);
+      dropInClient.launchDropIn(dropInRequest);
+
     } else {
       result.notImplemented();
     }
+  }
+
+  @Override
+  public void onDropInSuccess(@NonNull DropInResult dropInResult) {
+      if (activeResult != null) {
+          PaymentMethodNonce paymentMethodNonce = dropInResult.getPaymentMethodNonce();
+          HashMap<String, Object> result = new HashMap<>();
+
+          HashMap<String, Object> nonceResult = new HashMap<String, Object>();
+          nonceResult.put("nonce", paymentMethodNonce.getString());
+          nonceResult.put("typeLabel", dropInResult.getPaymentMethodType().name());
+          nonceResult.put("description", dropInResult.getPaymentDescription());
+          nonceResult.put("isDefault", paymentMethodNonce.isDefault());
+
+          result.put("paymentMethodNonce", nonceResult);
+          result.put("deviceData", dropInResult.getDeviceData());
+          this.activeResult.success(result);
+          activeResult.success(result);
+          activeResult = null;
+      }
+  }
+
+  @Override
+  public void onDropInFailure(@NonNull Exception error) {
+      if (activeResult != null) {
+          if (error instanceof UserCanceledException) {
+              activeResult.success(null);
+          } else {
+              activeResult.error("braintree_error", error.getMessage(), null);
+          }
+          activeResult = null;
+      }
   }
 
   private static void readGooglePaymentParameters(DropInRequest dropInRequest, MethodCall call) {
@@ -185,37 +219,4 @@ public class FlutterBraintreeDropIn  implements FlutterPlugin, ActivityAware, Me
     dropInRequest.setPayPalRequest(paypalRequest);
   }
 
-  @Override
-  public boolean onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-    if (this.activeResult == null)
-      return false;
-
-    switch (requestCode) {
-      case DROP_IN_REQUEST_CODE:
-        if (resultCode == Activity.RESULT_OK) {
-          DropInResult dropInResult = data.getParcelableExtra("dropInResult");
-          PaymentMethodNonce paymentMethodNonce = dropInResult.getPaymentMethodNonce();
-          HashMap<String, Object> result = new HashMap<String, Object>();
-
-          HashMap<String, Object> nonceResult = new HashMap<String, Object>();
-          nonceResult.put("nonce", paymentMethodNonce.getString());
-          nonceResult.put("typeLabel", dropInResult.getPaymentMethodType().name());
-          nonceResult.put("description", dropInResult.getPaymentDescription());
-          nonceResult.put("isDefault", paymentMethodNonce.isDefault());
-
-          result.put("paymentMethodNonce", nonceResult);
-          result.put("deviceData", dropInResult.getDeviceData());
-          this.activeResult.success(result);
-        } else if (resultCode == Activity.RESULT_CANCELED) {
-          activeResult.success(null);
-        } else {
-          String error = data.getStringExtra("error");
-          activeResult.error("braintree_error", error, null);
-        }
-        activeResult = null;
-        return true;
-      default:
-        return false;
-    }
-  }
 }
