@@ -41,9 +41,9 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
             Intent intent = getIntent();
 
             authorization = intent.getStringExtra("authorization");
-            if (authorization == null || authorization.isEmpty()) {
-                throw new Exception("Authorization is required");
-            }
+            // if (authorization == null || authorization.isEmpty()) {
+            //     throw new Exception("Authorization is required");
+            // }
 
             String returnUrlScheme = (getPackageName() + ".return.from.braintree").replace("_", "").toLowerCase();
             Log.d("FlutterBraintreeCustom", "returnUrlScheme = " + returnUrlScheme);

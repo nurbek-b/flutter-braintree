@@ -74,8 +74,7 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
     public void startThreeDSecureFlow() {
         ThreeDSecureRequest request = createThreeDSecureRequest(intent);
 
-        threeDSecureClient.createPaymentAuthRequest(request, paymentAuthRequest -> {
-
+        threeDSecureClient.createPaymentAuthRequest(activity, request, paymentAuthRequest -> {
             if (paymentAuthRequest instanceof ThreeDSecurePaymentAuthRequest.ReadyToLaunch) {
                 threeDSecureLauncher.launch(
                     (ThreeDSecurePaymentAuthRequest.ReadyToLaunch) paymentAuthRequest
@@ -127,7 +126,6 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
         request.setAmount(amount);
         request.setEmail(email);
         request.setBillingAddress(billingAddress);
-        request.setVersionRequested(ThreeDSecureRequest.VERSION_2);
         request.setChallengeRequested(true);
         request.setDataOnlyRequested(false);
         

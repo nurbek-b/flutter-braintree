@@ -12,6 +12,8 @@ import com.braintreepayments.api.googlepay.GooglePayResult;
 import com.braintreepayments.api.googlepay.GooglePayReadinessResult;
 import com.braintreepayments.api.core.PaymentMethodNonce;
 import com.braintreepayments.api.core.UserCanceledException;
+import com.braintreepayments.api.googlepay.GooglePayTotalPriceStatus;
+import com.braintreepayments.api.googlepay.GooglePayBillingAddressFormat;
 
 import com.google.android.gms.wallet.WalletConstants;
 
@@ -79,12 +81,12 @@ public class FlutterBraintreeGooglePayHandler {
         GooglePayRequest request = new GooglePayRequest(
             "USD", 
             totalPrice, 
-            WalletConstants.TOTAL_PRICE_STATUS_FINAL
+            GooglePayTotalPriceStatus.TOTAL_PRICE_STATUS_FINAL
         );
 
         request.setBillingAddressRequired(true);
         request.setPhoneNumberRequired(true);
-        request.setBillingAddressFormat(GooglePayRequest.BILLING_ADDRESS_FORMAT_FULL);
+        request.setBillingAddressFormat(GooglePayBillingAddressFormat.FULL);
 
         return request;
     }

@@ -61,14 +61,14 @@ public class FlutterBraintreePayPalHandler {
         String authorization = intent.getStringExtra("authorization");
         Map<String, Object> request = (Map<String, Object>) intent.getSerializableExtra("request");
 
-        if (request == null) {
-            throw new Exception("request parameters are required for PayPal integration");
-        }
+        // if (request == null) {
+        //     throw new Exception("request parameters are required for PayPal integration");
+        // }
 
         String returnUrl = (String) request.get("returnUrl");
-        if (returnUrl == null) {
-            throw new Exception("returnUrl is required for PayPal v5 integration");
-        }
+        // if (returnUrl == null) {
+        //     throw new Exception("returnUrl is required for PayPal v5 integration");
+        // }
         
         return new PayPalClient(
             activity,
