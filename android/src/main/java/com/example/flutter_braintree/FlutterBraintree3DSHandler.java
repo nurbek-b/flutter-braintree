@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 
 import com.braintreepayments.api.card.Card;
 import com.braintreepayments.api.card.CardClient;
+import com.braintreepayments.api.card.CardResult;
 import com.braintreepayments.api.threedsecure.ThreeDSecureClient;
 import com.braintreepayments.api.threedsecure.ThreeDSecureLauncher;
 import com.braintreepayments.api.threedsecure.ThreeDSecureRequest;

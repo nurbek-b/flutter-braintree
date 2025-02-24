@@ -134,23 +134,15 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
             nonceMap.put("lastTwo", googlePayCard.getLastTwo());
         }
         DataCollectorRequest dataCollectorRequest = new DataCollectorRequest(true); 
-        dataCollector.collectDeviceData(this, dataCollectorRequest, (@Nullable String collectedDeviceData, @Nullable Exception error) -> {
-            if (error != null) {
-                Log.e("FlutterBraintreeCustom", "Error collecting device data: " + error.getMessage());
-                deviceData = null;
-            } else {
-                deviceData = collectedDeviceData;
+        dataCollector.collectDeviceData(this, dataCollectorRequest, result -> {
+            if (result instanceof DataCollectorResult.Success) {
+                deviceData = ((DataCollectorResult.Success) result).getDeviceData();
                 Log.d("FlutterBraintreeCustom", "Device data collected successfully");
+            } else if (result instanceof DataCollectorResult.Failure) {
+                DataCollectorResult.Failure failure = (DataCollectorResult.Failure) result;
+                Log.e("FlutterBraintreeCustom", "Error collecting device data: " + failure.getError().getMessage());
+                deviceData = null;
             }
-
-            nonceMap.put("deviceData", deviceData);
-            nonceMap.put("billingInfo", billingAddress);
-
-            Intent result = new Intent();
-            result.putExtra("type", "paymentMethodNonce");
-            result.putExtra("paymentMethodNonce", nonceMap);
-            setResult(RESULT_OK, result);
-            finish();
         });
 
     }

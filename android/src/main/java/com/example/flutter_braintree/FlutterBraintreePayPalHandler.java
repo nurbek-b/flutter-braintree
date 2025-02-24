@@ -20,6 +20,8 @@ import com.braintreepayments.api.paypal.PayPalPaymentAuthRequest;
 import com.braintreepayments.api.paypal.PayPalPendingRequest;
 import com.braintreepayments.api.paypal.PayPalPaymentAuthResult;
 import com.braintreepayments.api.paypal.PayPalResult;
+import com.braintreepayments.api.paypal.PayPalPaymentUserAction;
+
 
 public class FlutterBraintreePayPalHandler {
 
@@ -78,7 +80,7 @@ public class FlutterBraintreePayPalHandler {
     public void handleReturnToApp(Intent intent) {
         if (hasPendingRequest()) {
 
-            PayPalPendingRequest pendingRequest = getPendingRequestFromPersistentStore();
+            PayPalPendingRequest.Started  pendingRequest = (PayPalPendingRequest.Started)  getPendingRequestFromPersistentStore();
 
             Log.d("FlutterBraintreePayPalHandler", "Processing PayPal return with pending request");
             PayPalPaymentAuthResult result = payPalLauncher.handleReturnToApp(pendingRequest, intent);
@@ -102,10 +104,7 @@ public class FlutterBraintreePayPalHandler {
 
     public void requestPaypalNonce(Intent intent) {
         
-        PayPalRequest request;
-        
         Log.d("FlutterBraintreePayPalHandler", "requestPaypalNonce");
-
 
         if (intent == null) {
             activity.onError(new Exception("Intent cannot be null"));
@@ -182,21 +181,18 @@ public class FlutterBraintreePayPalHandler {
         Log.d("FlutterBraintreePayPalHandler", "billingAgreementDescription: " + billingAgreementDescription);
         Log.d("FlutterBraintreePayPalHandler", "currencyCode: " + currencyCode);
 
-        PayPalCheckoutRequest request = new PayPalCheckoutRequest(
-            amount,
-            false
-        );
+        PayPalCheckoutRequest request = new PayPalCheckoutRequest(amount, false);
+
+        request.setIntent(getPaymentIntent(intent));
         request.setCurrencyCode(currencyCode);
-        request.setMerchantName(displayName);
+        request.setDisplayName(displayName);
         request.setBillingAgreementDescription(billingAgreementDescription);
-        request.setShippingAddressRequired(false);
-        request.setPaymentIntent(getPaymentIntent(intent));
         
         return request;
     }
 
 
-    private String getPaymentIntent(Intent intent) {
+    private PayPalPaymentIntent getPaymentIntent(Intent intent) {
         String paymentIntent = intent.getStringExtra("payPalPaymentIntent");
         switch (paymentIntent) {
             case "order":
