@@ -1,15 +1,17 @@
+package com.example.flutter_braintree;
+
 import android.content.Intent;
 import android.util.Log;
 import androidx.annotation.NonNull;
 
-import com.braintreepayments.api.Card;
-import com.braintreepayments.api.CardClient;
-import com.braintreepayments.api.ThreeDSecureClient;
-import com.braintreepayments.api.ThreeDSecureLauncher;
-import com.braintreepayments.api.ThreeDSecureRequest;
-import com.braintreepayments.api.ThreeDSecureResult;
-import com.braintreepayments.api.ThreeDSecurePaymentAuthRequest;
-import com.braintreepayments.api.Address;
+import com.braintreepayments.api.card.Card;
+import com.braintreepayments.api.card.CardClient;
+import com.braintreepayments.api.threedsecure.ThreeDSecureClient;
+import com.braintreepayments.api.threedsecure.ThreeDSecureLauncher;
+import com.braintreepayments.api.threedsecure.ThreeDSecureRequest;
+import com.braintreepayments.api.threedsecure.ThreeDSecureResult;
+import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthRequest;
+import com.braintreepayments.api.threedsecure.ThreeDSecurePostalAddress;
 
 import java.util.HashMap;
 
@@ -60,10 +62,10 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
         card.setNumber(intent.getStringExtra("cardNumber"));
 
         cardClient.tokenize(card, (cardResult) -> {
-            if (cardResult instanceof Card.Success) {
-                activity.onPaymentMethodNonceCreated(((Card.Success) cardResult).getNonce(), activity.createEmptyBillingAddress());
-            } else if (cardResult instanceof Card.Failure) {
-                activity.onError(((Card.Failure) cardResult).getError());
+            if (cardResult instanceof CardResult.Success) {
+                activity.onPaymentMethodNonceCreated(((CardResult.Success) cardResult).getNonce(), activity.createEmptyBillingAddress());
+            } else if (cardResult instanceof CardResult.Failure) {
+                activity.onError(((CardResult.Failure) cardResult).getError());
             }
         });
     }
@@ -124,6 +126,9 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
         request.setAmount(amount);
         request.setEmail(email);
         request.setBillingAddress(billingAddress);
+        request.setVersionRequested(ThreeDSecureRequest.VERSION_2);
+        request.setChallengeRequested(true);
+        request.setDataOnlyRequested(false);
         
         return request;
     }

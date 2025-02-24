@@ -8,13 +8,14 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.braintreepayments.api.BraintreeClient;
-import com.braintreepayments.api.Card;
-import com.braintreepayments.api.PayPalAccount;
-import com.braintreepayments.api.GooglePayCard;
-import com.braintreepayments.api.Address;
-import com.braintreepayments.api.DataCollector;
-import com.braintreepayments.api.DataCollectorRequest;
+import com.braintreepayments.api.core.PaymentMethodNonce;
+import com.braintreepayments.api.card.CardNonce;
+import com.braintreepayments.api.paypal.PayPalAccountNonce;
+import com.braintreepayments.api.googlepay.GooglePayCardNonce;
+import com.braintreepayments.api.core.PostalAddress;
+import com.braintreepayments.api.datacollector.DataCollector;
+import com.braintreepayments.api.datacollector.DataCollectorRequest;
+import com.braintreepayments.api.datacollector.DataCollectorResult;
 
 import java.util.HashMap;
 
@@ -52,19 +53,29 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
             
             // Initialize DataCollector with authorization as per v5 requirements
             dataCollector = new DataCollector(this, authorization);
+            DataCollectorRequest request = new DataCollectorRequest(true);
+            dataCollector.collectDeviceData(this, request, result -> {
+                if (result instanceof DataCollectorResult.Success) {
+                    FlutterBraintreeCustom.this.deviceData = ((DataCollectorResult.Success) result).getDeviceData();
+                } else if (result instanceof DataCollectorResult.Failure) {
+                    Log.e("FlutterBraintreeCustom", "Error collecting device data: " +
+                        ((DataCollectorResult.Failure) result).getError().getMessage());
+                    deviceData = null;
+                }
+            });
 
             if (type.equals("tokenizeCreditCard")) {
                 treeDSHandler = new FlutterBraintree3DSHandler(this);
                 treeDSHandler.tokenizeCreditCard();
             } else if (type.equals("requestPaypalNonce")) {
                 payPalHandler = new FlutterBraintreePayPalHandler(this);
-                payPalHandler.requestPaypalNonce();
+                payPalHandler.requestPaypalNonce(intent);
             } else if (type.equals("startThreeDSecureFlow")) {
                 treeDSHandler = new FlutterBraintree3DSHandler(this);
                 treeDSHandler.startThreeDSecureFlow();
             } else if (type.equals("startGooglePaymentFlow")) {
                 googlePayHandler = new FlutterBraintreeGooglePayHandler(this);
-                googlePayHandler.startGooglePaymentFlow();
+                googlePayHandler.startGooglePaymentFlow(intent);
             } else if (type.equals("checkGooglePayReady")) {
                 googlePayHandler = new FlutterBraintreeGooglePayHandler(this);
                 googlePayHandler.checkGooglePayReady();
@@ -99,24 +110,24 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
         payPalHandler.handleReturnToApp(intent);
     }
 
-    public void onPaymentMethodNonceCreated(BraintreeClient.PaymentMethodNonce paymentMethodNonce, HashMap<String, String> billingAddress) {
+    public void onPaymentMethodNonceCreated(PaymentMethodNonce paymentMethodNonce, HashMap<String, String> billingAddress) {
         Log.d("FlutterBraintreeCustom", "onPaymentMethodNonceCreated");
         HashMap<String, Object> nonceMap = new HashMap<String, Object>();
         nonceMap.put("nonce", paymentMethodNonce.getString());
         nonceMap.put("isDefault", paymentMethodNonce.isDefault());
         nonceMap.put("billingInfo", billingAddress);
         nonceMap.put("deviceData", deviceData);
-        if (paymentMethodNonce instanceof PayPalAccount) {
-            PayPalAccount paypalAccount = (PayPalAccount) paymentMethodNonce;
+        if (paymentMethodNonce instanceof PayPalAccountNonce) {
+            PayPalAccountNonce paypalAccount = (PayPalAccountNonce) paymentMethodNonce;
             nonceMap.put("paypalPayerId", paypalAccount.getPayerId());
             nonceMap.put("typeLabel", "PayPal");
             nonceMap.put("description", paypalAccount.getEmail());
-        } else if (paymentMethodNonce instanceof Card) {
-            Card card = (Card) paymentMethodNonce;
+        } else if (paymentMethodNonce instanceof CardNonce) {
+            CardNonce card = (CardNonce) paymentMethodNonce;
             nonceMap.put("typeLabel", card.getCardType());
             nonceMap.put("description", "ending in ••" + card.getLastTwo());
-        } else if (paymentMethodNonce instanceof GooglePayCard) {
-            GooglePayCard googlePayCard = (GooglePayCard) paymentMethodNonce;
+        } else if (paymentMethodNonce instanceof GooglePayCardNonce) {
+            GooglePayCardNonce googlePayCard = (GooglePayCardNonce) paymentMethodNonce;
             nonceMap.put("cardType", googlePayCard.getCardType());
             nonceMap.put("typeLabel", "GooglePay");
             nonceMap.put("description", googlePayCard.getEmail());
@@ -161,12 +172,12 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
     }
 
 
-    private HashMap<String, String> fillBillingAddressFromNonce(BraintreeClient.PaymentMethodNonce paymentMethodNonce) {
+    public HashMap<String, String> fillBillingAddressFromNonce(PaymentMethodNonce paymentMethodNonce) {
         HashMap<String, String> billingAddressMap = createEmptyBillingAddress();
         
-        if (paymentMethodNonce instanceof GooglePayCard) {
-            GooglePayCard googlePayCard = (GooglePayCard) paymentMethodNonce;
-            Address googlePayBillingAddress = googlePayCard.getBillingAddress();
+        if (paymentMethodNonce instanceof GooglePayCardNonce) {
+            GooglePayCardNonce googlePayCard = (GooglePayCardNonce) paymentMethodNonce;
+            PostalAddress googlePayBillingAddress = googlePayCard.getBillingAddress();
             
             if (googlePayBillingAddress != null) {
                 billingAddressMap.put("givenName", googlePayBillingAddress.getRecipientName());
@@ -180,9 +191,9 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
             }
         }
 
-        if (paymentMethodNonce instanceof PayPalAccount) {
-            PayPalAccount paypalAccount = (PayPalAccount) paymentMethodNonce;
-            Address paypalBillingAddress = paypalAccount.getBillingAddress();
+        if (paymentMethodNonce instanceof PayPalAccountNonce) {
+            PayPalAccountNonce paypalAccount = (PayPalAccountNonce) paymentMethodNonce;
+            PostalAddress paypalBillingAddress = paypalAccount.getBillingAddress();
             Log.d("FlutterBraintreeCustom", convertPayPalNonceToString(paypalAccount));
                         
             if (paypalBillingAddress != null) {
@@ -212,7 +223,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
     }
 
 
-    private HashMap<String, String> createEmptyBillingAddress() {
+    public HashMap<String, String> createEmptyBillingAddress() {
         HashMap<String, String> billingAddress = new HashMap<>();
         billingAddress.put("givenName", "");
         billingAddress.put("phoneNumber", "");
@@ -225,7 +236,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
         return billingAddress;
     }
 
-    private String convertPayPalNonceToString(PayPalAccount paypalAccount) {
+    public String convertPayPalNonceToString(PayPalAccountNonce paypalAccount) {
         if (paypalAccount == null) return "PayPalAccount is null";
         StringBuilder sb = new StringBuilder();
         sb.append("PayPalAccount Details:\n");

@@ -3,6 +3,13 @@ version '1.0'
 
 buildscript {
     repositories {
+        maven {
+            url "https://cardinalcommerceprod.jfrog.io/artifactory/android"
+            credentials {
+                username 'braintree_team_sdk'
+                password 'AKCp8jQcoDy2hxSWhDAUQKXLDPDx6NYRkqrgFLRc3qDrayg6rrCbJpsKKyMwaykVL8FWusJpp'
+            }
+        }
         google()
         mavenCentral()
     }
@@ -15,8 +22,6 @@ buildscript {
 
 rootProject.allprojects {
     repositories {
-        google()
-        mavenCentral()
         maven {
             url "https://cardinalcommerceprod.jfrog.io/artifactory/android"
             credentials {
@@ -24,6 +29,8 @@ rootProject.allprojects {
                 password 'AKCp8jQcoDy2hxSWhDAUQKXLDPDx6NYRkqrgFLRc3qDrayg6rrCbJpsKKyMwaykVL8FWusJpp'
             }
         }
+        google()
+        mavenCentral()
     }
 }
 
@@ -57,12 +64,14 @@ android {
 }
 
 dependencies {
-    implementation 'com.braintreepayments.api:braintree:5.6.0'
-    implementation 'com.braintreepayments.api:data-collector:5.6.0'
-    implementation 'com.braintreepayments.api:card:5.6.0'
-    implementation 'com.braintreepayments.api:paypal:5.6.0'
-    implementation 'com.braintreepayments.api:google-pay:5.6.0'
-    implementation 'com.braintreepayments.api:three-d-secure:5.6.0'
+    implementation 'com.braintreepayments.api:braintree-core:5.2.0'
+    implementation 'com.braintreepayments.api:card:5.2.0'
+    implementation 'com.braintreepayments.api:paypal:5.2.0'
+    implementation 'com.braintreepayments.api:google-pay:5.2.0'
+    implementation 'com.braintreepayments.api:three-d-secure:5.2.0'
+    implementation 'com.braintreepayments.api:data-collector:5.2.0'
+
+    implementation 'com.google.code.gson:gson:2.10.1'
 
     implementation 'com.google.android.gms:play-services-wallet:19.2.1'
     implementation 'androidx.appcompat:appcompat:1.6.1'

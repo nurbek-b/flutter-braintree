@@ -25,11 +25,8 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
     private Result activeResult;
     private String currentMethod = "";
 
-    private FlutterBraintreeDropIn dropIn;
-
     public static void registerWith(Registrar registrar) {
         Log.d("FlutterBraintreePlugin", "registerWith called");
-        FlutterBraintreeDropIn.registerWith(registrar);
         final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_braintree.custom");
         FlutterBraintreePlugin plugin = new FlutterBraintreePlugin();
         plugin.activity = registrar.activity();
@@ -42,16 +39,11 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
         Log.d("FlutterBraintreePlugin", "onAttachedToEngine called");
         final MethodChannel channel = new MethodChannel(binding.getBinaryMessenger(), "flutter_braintree.custom");
         channel.setMethodCallHandler(this);
-
-        dropIn = new FlutterBraintreeDropIn();
-        dropIn.onAttachedToEngine(binding);
     }
 
     @Override
     public void onDetachedFromEngine(FlutterPluginBinding binding) {
         Log.d("FlutterBraintreePlugin", "onDetachedFromEngine called");
-        dropIn.onDetachedFromEngine(binding);
-        dropIn = null;
     }
 
     @Override
@@ -59,14 +51,12 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
         Log.d("FlutterBraintreePlugin", "onAttachedToActivity called");
         activity = binding.getActivity();
         binding.addActivityResultListener(this);
-        dropIn.onAttachedToActivity(binding);
     }
 
     @Override
     public void onDetachedFromActivityForConfigChanges() {
         Log.d("FlutterBraintreePlugin", "onDetachedFromActivityForConfigChanges called");
         activity = null;
-        dropIn.onDetachedFromActivity();
     }
 
     @Override
@@ -74,14 +64,12 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
         Log.d("FlutterBraintreePlugin", "onReattachedToActivityForConfigChanges called");
         activity = binding.getActivity();
         binding.addActivityResultListener(this);
-        dropIn.onReattachedToActivityForConfigChanges(binding);
     }
 
     @Override
     public void onDetachedFromActivity() {
         Log.d("FlutterBraintreePlugin", "onDetachedFromActivity called");
         activity = null;
-        dropIn.onDetachedFromActivity();
     }
 
     @Override

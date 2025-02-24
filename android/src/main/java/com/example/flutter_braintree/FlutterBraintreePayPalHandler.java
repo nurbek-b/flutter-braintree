@@ -1,3 +1,5 @@
+package com.example.flutter_braintree;
+
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.Context;
@@ -5,36 +7,43 @@ import android.net.Uri;
 import android.util.Log;
 import androidx.annotation.NonNull;
 
-import com.braintreepayments.api.PayPalClient;
-import com.braintreepayments.api.PayPalLauncher;
-import com.braintreepayments.api.PayPalRequest;
-import com.braintreepayments.api.PayPalVaultRequest;
-import com.braintreepayments.api.PayPalCheckoutRequest;
-import com.braintreepayments.api.PayPalPaymentIntent;
-import com.braintreepayments.api.PayPalPaymentAuthRequest;
-import com.braintreepayments.api.PayPalPendingRequest;
-import com.braintreepayments.api.PayPalPaymentAuthResult;
-import com.braintreepayments.api.PayPalResult;
+import com.google.gson.Gson;
+import java.util.Map;
 
-import static com.braintreepayments.api.PayPalCheckoutRequest.USER_ACTION_COMMIT;
-import static com.braintreepayments.api.PayPalCheckoutRequest.USER_ACTION_DEFAULT;
+import com.braintreepayments.api.paypal.PayPalClient;
+import com.braintreepayments.api.paypal.PayPalLauncher;
+import com.braintreepayments.api.paypal.PayPalRequest;
+import com.braintreepayments.api.paypal.PayPalVaultRequest;
+import com.braintreepayments.api.paypal.PayPalCheckoutRequest;
+import com.braintreepayments.api.paypal.PayPalPaymentIntent;
+import com.braintreepayments.api.paypal.PayPalPaymentAuthRequest;
+import com.braintreepayments.api.paypal.PayPalPendingRequest;
+import com.braintreepayments.api.paypal.PayPalPaymentAuthResult;
+import com.braintreepayments.api.paypal.PayPalResult;
 
 public class FlutterBraintreePayPalHandler {
 
     private final FlutterBraintreeCustom activity;
-    private final PayPalClient payPalClient;
     private final PayPalLauncher payPalLauncher;
     
     private final long creationTimestamp;
     private static final String PREFS_NAME = "FlutterBraintreePayPalHandlerPrefs";
     private static final String PENDING_KEY = "paypal_pending";
+    private static final String PENDING_REQUEST_KEY = "paypal_pending_request";
     private final SharedPreferences sharedPreferences;
+    private final Gson gson;
+
+    private PayPalClient payPalClient;
+
 
     public FlutterBraintreePayPalHandler(FlutterBraintreeCustom activity) {
 
         Log.d("FlutterBraintreePayPalHandler", "constructed");
 
         this.activity = activity;
+
+        // Initialize Gson
+        this.gson = new Gson();
 
         // Create PayPalLauncher
         this.payPalLauncher = new PayPalLauncher();
@@ -68,8 +77,11 @@ public class FlutterBraintreePayPalHandler {
 
     public void handleReturnToApp(Intent intent) {
         if (hasPendingRequest()) {
+
+            PayPalPendingRequest pendingRequest = getPendingRequestFromPersistentStore();
+
             Log.d("FlutterBraintreePayPalHandler", "Processing PayPal return with pending request");
-            PayPalPaymentAuthResult result = payPalLauncher.handleReturnToApp(intent);
+            PayPalPaymentAuthResult result = payPalLauncher.handleReturnToApp(pendingRequest, intent);
             
             if (result instanceof PayPalPaymentAuthResult.Success) {
                 Log.d("FlutterBraintreePayPalHandler", "PayPal flow completed successfully");
@@ -152,7 +164,7 @@ public class FlutterBraintreePayPalHandler {
         Log.d("FlutterBraintreePayPalHandler", "displayName: " + displayName);
         Log.d("FlutterBraintreePayPalHandler", "billingAgreementDescription: " + billingAgreementDescription);
 
-        PayPalVaultRequest request = new PayPalVaultRequest();
+        PayPalVaultRequest request = new PayPalVaultRequest(false);
         request.setDisplayName(displayName);
         request.setBillingAgreementDescription(billingAgreementDescription);
         return request;
@@ -170,21 +182,19 @@ public class FlutterBraintreePayPalHandler {
         Log.d("FlutterBraintreePayPalHandler", "billingAgreementDescription: " + billingAgreementDescription);
         Log.d("FlutterBraintreePayPalHandler", "currencyCode: " + currencyCode);
 
-        PayPalCheckoutRequest request = new PayPalCheckoutRequest(amount);
+        PayPalCheckoutRequest request = new PayPalCheckoutRequest(
+            amount,
+            false
+        );
         request.setCurrencyCode(currencyCode);
-        request.setDisplayName(displayName);
+        request.setMerchantName(displayName);
         request.setBillingAgreementDescription(billingAgreementDescription);
-        
-        request.setUserAction(getUserAction(intent));
-        request.setIntent(getPaymentIntent(intent));
+        request.setShippingAddressRequired(false);
+        request.setPaymentIntent(getPaymentIntent(intent));
         
         return request;
     }
 
-    private String getUserAction(Intent intent) {
-        String userAction = intent.getStringExtra("payPalPaymentUserAction");
-        return "commit".equals(userAction) ? USER_ACTION_COMMIT : USER_ACTION_DEFAULT;
-    }
 
     private String getPaymentIntent(Intent intent) {
         String paymentIntent = intent.getStringExtra("payPalPaymentIntent");
@@ -236,7 +246,7 @@ public class FlutterBraintreePayPalHandler {
         return sharedPreferences.getBoolean(PENDING_KEY, false);
     }
 
-    private void clearPendingRequestFromPersistentStore() {
+    private void clearPendingRequest() {
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.remove(PENDING_REQUEST_KEY);
         editor.apply();
