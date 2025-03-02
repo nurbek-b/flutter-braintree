@@ -45,7 +45,9 @@ public class FlutterBraintreePayPalHandler {
         this.activity = activity;
 
         // Initialize Gson
-        this.gson = new Gson();
+        this.gson = new GsonBuilder()
+            .registerTypeAdapter(PayPalPendingRequest.class, new PayPalPendingRequestAdapter())
+            .create();
 
         // Create PayPalLauncher
         this.payPalLauncher = new PayPalLauncher();
@@ -59,24 +61,18 @@ public class FlutterBraintreePayPalHandler {
     public PayPalClient initializePayPalClient (Intent intent) {
 
         Log.d("FlutterBraintreePayPalHandler", "initializePayPalClient");
+        Log.d("FlutterBraintreePayPalHandler", "Extracting authorization and returnUrl from intent");
 
         String authorization = intent.getStringExtra("authorization");
-        Map<String, Object> request = (Map<String, Object>) intent.getSerializableExtra("request");
+        String returnUrl =  intent.getStringExtra("returnUrl");
 
-        if (request == null) {
-            throw new Exception("request parameters are required for PayPal integration");
-        }
-
-        String returnUrl = (String) request.get("returnUrl");
-        if (returnUrl == null) {
-            throw new Exception("returnUrl is required for PayPal v5 integration");
-        }
-        
+        Log.d("FlutterBraintreePayPalHandler", "Initializing PayPalClient with authorization: " + authorization + " and returnUrl: " + returnUrl);    
         return new PayPalClient(
             activity,
             authorization,
             Uri.parse(returnUrl)
         );
+
     }
 
     public void handleReturnToApp(Intent intent) {
@@ -249,21 +245,60 @@ public class FlutterBraintreePayPalHandler {
     }
 
     // Store pending request
+    private static class PayPalPendingRequestAdapter implements JsonSerializer<PayPalPendingRequest>, JsonDeserializer<PayPalPendingRequest> {
+        @Override
+        public JsonElement serialize(PayPalPendingRequest src, Type typeOfSrc, JsonSerializationContext context) {
+            JsonObject json = new JsonObject();
+            if (src instanceof PayPalPendingRequest.Started) {
+                PayPalPendingRequest.Started started = (PayPalPendingRequest.Started) src;
+                json.addProperty("type", "Started");
+                // Add any necessary fields from Started instance
+                // These fields would depend on the PayPalPendingRequest.Started implementation
+            }
+            return json;
+        }
+
+        @Override
+        public PayPalPendingRequest deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) 
+            throws JsonParseException {
+            JsonObject jsonObject = json.getAsJsonObject();
+            String type = jsonObject.get("type").getAsString();
+            
+            if ("Started".equals(type)) {
+                // Create a Started instance with necessary data
+                // This would depend on the PayPalPendingRequest.Started constructor/factory method
+                return /* construct Started instance */;
+            }
+            
+            throw new JsonParseException("Unknown PayPalPendingRequest type: " + type);
+        }
+    }
 
     private void storePendingRequest(PayPalPendingRequest request) {
         Log.d("FlutterBraintreePayPalHandler", "storePendingRequest");
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        String json = gson.toJson(request);
-        editor.putString(PENDING_REQUEST_KEY, json);
-        editor.putBoolean(PENDING_KEY, true);
-        editor.apply();
+        try {
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            String json = gson.toJson(request, PayPalPendingRequest.class));
+            editor.putString(PENDING_REQUEST_KEY, json);
+            editor.putBoolean(PENDING_KEY, true);
+            editor.apply();
+            Log.d("FlutterBraintreePayPalHandler", "storePendingRequest success");
+        } catch (Exception e) {
+            Log.e("FlutterBraintreePayPalHandler", "Error storing pending request", e);
+            clearPendingRequest();
+        }
     }
 
     private PayPalPendingRequest getPendingRequestFromPersistentStore() {
         Log.d("FlutterBraintreePayPalHandler", "getPendingRequestFromPersistentStore");
-        String json = sharedPreferences.getString(PENDING_REQUEST_KEY, null);
-        if (json != null) {
-            return gson.fromJson(json, PayPalPendingRequest.class);
+        try {
+            String json = sharedPreferences.getString(PENDING_REQUEST_KEY, null);
+            if (json != null) {
+                return gson.fromJson(json, PayPalPendingRequest.class);
+            }
+        } catch (Exception e) {
+            Log.e("FlutterBraintreePayPalHandler", "Error getting pending request", e);
+            clearPendingRequest();
         }
         return null;
     }

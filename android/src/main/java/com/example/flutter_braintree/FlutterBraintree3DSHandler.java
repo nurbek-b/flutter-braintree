@@ -97,9 +97,9 @@ public class FlutterBraintree3DSHandler {
             else if (paymentAuthRequest instanceof ThreeDSecurePaymentAuthRequest.Failure) {
                 Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow Failure");
                 activity.onError(((ThreeDSecurePaymentAuthRequest.Failure) paymentAuthRequest).getError());
-            else {
+            } else {
                 Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow Unknown");
-                activity.onError("Unknown error");
+                activity.onError(new Exception("startThreeDSecureFlow Unknown"));
             }
         });
     }

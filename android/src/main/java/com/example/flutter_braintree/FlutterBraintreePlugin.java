@@ -108,6 +108,7 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
                 requestPaypalNonceIntent.putExtra("payPalPaymentIntent", (String) requestPaypalNonceRequest.get("payPalPaymentIntent"));
                 requestPaypalNonceIntent.putExtra("payPalPaymentUserAction", (String) requestPaypalNonceRequest.get("payPalPaymentUserAction"));
                 requestPaypalNonceIntent.putExtra("billingAgreementDescription", (String) requestPaypalNonceRequest.get("billingAgreementDescription"));
+                requestPaypalNonceIntent.putExtra("returnUrl", (String) requestPaypalNonceRequest.get("returnUrl"));
                 activity.startActivityForResult(requestPaypalNonceIntent, CUSTOM_ACTIVITY_REQUEST_CODE);
                 break;
             case "startThreeDSecureFlow":
