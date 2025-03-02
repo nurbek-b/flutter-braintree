@@ -50,6 +50,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
             
             String type = intent.getStringExtra("type");
             setContentView(R.layout.activity_flutter_braintree_custom);
+            Log.d("FlutterBraintreeCustom", "type = " + type);
             
             // Initialize DataCollector with authorization as per v5 requirements
             dataCollector = new DataCollector(this, authorization);
@@ -63,6 +64,7 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
                     deviceData = null;
                 }
             });
+            Log.d("FlutterBraintreeCustom", "Device data collected successfully " + deviceData);
 
             if (type.equals("tokenizeCreditCard")) {
                 treeDSHandler = new FlutterBraintree3DSHandler(this);
@@ -107,26 +109,32 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
     }
 
     public void handleReturnToApp(Intent intent) {
-        payPalHandler.handleReturnToApp(intent);
+        if (payPalHandler != null) {
+            payPalHandler.handleReturnToApp(intent);
+        }
     }
 
     public void onPaymentMethodNonceCreated(PaymentMethodNonce paymentMethodNonce, HashMap<String, String> billingAddress) {
         Log.d("FlutterBraintreeCustom", "onPaymentMethodNonceCreated");
+        Log.d("FlutterBraintreeCustom", "nonce = " + paymentMethodNonce.getString());
         HashMap<String, Object> nonceMap = new HashMap<String, Object>();
         nonceMap.put("nonce", paymentMethodNonce.getString());
         nonceMap.put("isDefault", paymentMethodNonce.isDefault());
         nonceMap.put("billingInfo", billingAddress);
         nonceMap.put("deviceData", deviceData);
         if (paymentMethodNonce instanceof PayPalAccountNonce) {
+            Log.d("FlutterBraintreeCustom", "PayPalAccountNonce");
             PayPalAccountNonce paypalAccount = (PayPalAccountNonce) paymentMethodNonce;
             nonceMap.put("paypalPayerId", paypalAccount.getPayerId());
             nonceMap.put("typeLabel", "PayPal");
             nonceMap.put("description", paypalAccount.getEmail());
         } else if (paymentMethodNonce instanceof CardNonce) {
+            Log.d("FlutterBraintreeCustom", "CardNonce");
             CardNonce card = (CardNonce) paymentMethodNonce;
             nonceMap.put("typeLabel", card.getCardType());
             nonceMap.put("description", "ending in ••" + card.getLastTwo());
         } else if (paymentMethodNonce instanceof GooglePayCardNonce) {
+            Log.d("FlutterBraintreeCustom", "GooglePayCardNonce");
             GooglePayCardNonce googlePayCard = (GooglePayCardNonce) paymentMethodNonce;
             nonceMap.put("cardType", googlePayCard.getCardType());
             nonceMap.put("typeLabel", "GooglePay");
@@ -137,14 +145,24 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
         dataCollector.collectDeviceData(this, dataCollectorRequest, result -> {
             if (result instanceof DataCollectorResult.Success) {
                 deviceData = ((DataCollectorResult.Success) result).getDeviceData();
-                Log.d("FlutterBraintreeCustom", "Device data collected successfully");
+                Log.d("FlutterBraintreeCustom", "Device data collected successfully " + deviceData);
             } else if (result instanceof DataCollectorResult.Failure) {
                 DataCollectorResult.Failure failure = (DataCollectorResult.Failure) result;
                 Log.e("FlutterBraintreeCustom", "Error collecting device data: " + failure.getError().getMessage());
                 deviceData = null;
             }
         });
+          
+        nonceMap.put("deviceData", deviceData);
+        nonceMap.put("billingInfo", billingAddress);
 
+        Intent result = new Intent();
+        result.putExtra("type", "paymentMethodNonce");
+        result.putExtra("paymentMethodNonce", nonceMap);
+
+        Log.d("FlutterBraintreeCustom", "onPaymentMethodNonceCreated Success");
+        setResult(RESULT_OK, result);
+        finish();
     }
 
     public void onCancel() {

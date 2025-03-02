@@ -23,18 +23,19 @@ public class FlutterBraintree3DSHandler {
     private final ThreeDSecureClient threeDSecureClient;
     private final CardClient cardClient;
     private final ThreeDSecureLauncher threeDSecureLauncher;
-public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
-    Log.d("FlutterBraintree3DSHandler", "FlutterBraintree3DSHandler");
 
-    this.activity = activity;
-    this.intent = activity.getIntent();
-    String authorization = intent.getStringExtra("authorization");
-    
-    // Initialize clients without BraintreeClient
-    this.cardClient = new CardClient(activity, authorization);
-    this.threeDSecureClient = new ThreeDSecureClient(activity, authorization);
-    
-    // Initialize launcher with callback
+    public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
+        Log.d("FlutterBraintree3DSHandler", "FlutterBraintree3DSHandler");
+
+        this.activity = activity;
+        this.intent = activity.getIntent();
+        String authorization = intent.getStringExtra("authorization");
+        
+        // Initialize clients without BraintreeClient
+        this.cardClient = new CardClient(activity, authorization);
+        this.threeDSecureClient = new ThreeDSecureClient(activity, authorization);
+        
+        // Initialize launcher with callback
         this.threeDSecureLauncher = new ThreeDSecureLauncher(activity, paymentAuthResult -> {
             Log.d("FlutterBraintree3DSHandler", "ThreeDSecureLauncher paymentAuthResult = " + paymentAuthResult);
             threeDSecureClient.tokenize(paymentAuthResult, result -> {
@@ -55,6 +56,8 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
     }
 
     protected void tokenizeCreditCard() {
+        Log.d("FlutterBraintree3DSHandler", "tokenizeCreditCard");
+
         Card card = new Card();
         card.setExpirationMonth(intent.getStringExtra("expirationMonth"));
         card.setExpirationYear(intent.getStringExtra("expirationYear"));
@@ -63,6 +66,7 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
         card.setNumber(intent.getStringExtra("cardNumber"));
 
         cardClient.tokenize(card, (cardResult) -> {
+            Log.d("FlutterBraintree3DSHandler", "tokenizeCreditCard cardResult = " + cardResult);
             if (cardResult instanceof CardResult.Success) {
                 activity.onPaymentMethodNonceCreated(((CardResult.Success) cardResult).getNonce(), activity.createEmptyBillingAddress());
             } else if (cardResult instanceof CardResult.Failure) {
@@ -72,32 +76,44 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
     }
 
     public void startThreeDSecureFlow() {
+        Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow");
+
         ThreeDSecureRequest request = createThreeDSecureRequest(intent);
 
         threeDSecureClient.createPaymentAuthRequest(activity, request, paymentAuthRequest -> {
             if (paymentAuthRequest instanceof ThreeDSecurePaymentAuthRequest.ReadyToLaunch) {
+                Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow ReadyToLaunch");
                 threeDSecureLauncher.launch(
                     (ThreeDSecurePaymentAuthRequest.ReadyToLaunch) paymentAuthRequest
                 );
             }
             else if (paymentAuthRequest instanceof ThreeDSecurePaymentAuthRequest.LaunchNotRequired) {
+                Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow LaunchNotRequired");
                 // No additional authentication needed
                 ThreeDSecurePaymentAuthRequest.LaunchNotRequired noAuth = 
                     (ThreeDSecurePaymentAuthRequest.LaunchNotRequired) paymentAuthRequest;
                 activity.onPaymentMethodNonceCreated(noAuth.getNonce(), activity.createEmptyBillingAddress());
             }
             else if (paymentAuthRequest instanceof ThreeDSecurePaymentAuthRequest.Failure) {
+                Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow Failure");
                 activity.onError(((ThreeDSecurePaymentAuthRequest.Failure) paymentAuthRequest).getError());
+            else {
+                Log.d("FlutterBraintree3DSHandler", "startThreeDSecureFlow Unknown");
+                activity.onError("Unknown error");
             }
         });
     }
 
     private ThreeDSecureRequest createThreeDSecureRequest(Intent intent) {
+        Log.d("FlutterBraintree3DSHandler", "createThreeDSecureRequest");
 
         // Extract data from intent
         String nonce = intent.getStringExtra("nonce");
         String amount = intent.getStringExtra("amount");
         String email = intent.getStringExtra("email");
+        Log.d("FlutterBraintree3DSHandler", "createThreeDSecureRequest nonce = " + nonce);
+        Log.d("FlutterBraintree3DSHandler", "createThreeDSecureRequest amount = " + amount);
+        Log.d("FlutterBraintree3DSHandler", "createThreeDSecureRequest email = " + email);
 
         HashMap<String, String> billingAddressMap = (HashMap<String, String>) intent.getSerializableExtra("billingAddress");
         String surname = billingAddressMap.get("surname");
@@ -128,6 +144,8 @@ public FlutterBraintree3DSHandler(FlutterBraintreeCustom activity) {
         request.setBillingAddress(billingAddress);
         request.setChallengeRequested(true);
         request.setDataOnlyRequested(false);
+
+        Log.d("FlutterBraintree3DSHandler", "createThreeDSecureRequest request = " + request);
         
         return request;
     }

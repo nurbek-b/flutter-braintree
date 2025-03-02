@@ -58,17 +58,19 @@ public class FlutterBraintreePayPalHandler {
 
     public PayPalClient initializePayPalClient (Intent intent) {
 
+        Log.d("FlutterBraintreePayPalHandler", "initializePayPalClient");
+
         String authorization = intent.getStringExtra("authorization");
         Map<String, Object> request = (Map<String, Object>) intent.getSerializableExtra("request");
 
-        // if (request == null) {
-        //     throw new Exception("request parameters are required for PayPal integration");
-        // }
+        if (request == null) {
+            throw new Exception("request parameters are required for PayPal integration");
+        }
 
         String returnUrl = (String) request.get("returnUrl");
-        // if (returnUrl == null) {
-        //     throw new Exception("returnUrl is required for PayPal v5 integration");
-        // }
+        if (returnUrl == null) {
+            throw new Exception("returnUrl is required for PayPal v5 integration");
+        }
         
         return new PayPalClient(
             activity,
@@ -78,7 +80,10 @@ public class FlutterBraintreePayPalHandler {
     }
 
     public void handleReturnToApp(Intent intent) {
+        Log.d("FlutterBraintreePayPalHandler", "handleReturnToApp");
+
         if (hasPendingRequest()) {
+            Log.d("FlutterBraintreePayPalHandler", "Found pending request");
 
             PayPalPendingRequest.Started  pendingRequest = (PayPalPendingRequest.Started)  getPendingRequestFromPersistentStore();
 
@@ -95,10 +100,15 @@ public class FlutterBraintreePayPalHandler {
                 Log.e("FlutterBraintreePayPalHandler", "PayPal flow failed", 
                     ((PayPalPaymentAuthResult.Failure) result).getError());
                 activity.onError(((PayPalPaymentAuthResult.Failure) result).getError());
+            } else {
+                Log.e("FlutterBraintreePayPalHandler", "Unexpected PayPal flow result");
+                activity.onError(new Exception("Unexpected PayPal flow result"));
             }
             
             clearPendingRequest();
             Log.d("FlutterBraintreePayPalHandler", "Cleared pending request");
+        } else {
+            Log.d("FlutterBraintreePayPalHandler", "No pending request found");
         }
     }
 
@@ -116,16 +126,21 @@ public class FlutterBraintreePayPalHandler {
 
         payPalClient.createPaymentAuthRequest(activity, request, paymentAuthRequest -> {
             if (paymentAuthRequest instanceof PayPalPaymentAuthRequest.ReadyToLaunch) {
+                Log.d("FlutterBraintreePayPalHandler", "Ready to launch PayPal flow");  
                 PayPalPendingRequest pendingRequest = payPalLauncher.launch(
                     activity, 
                     (PayPalPaymentAuthRequest.ReadyToLaunch) paymentAuthRequest
                 );
+                Log.d("FlutterBraintreePayPalHandler", "Launched PayPal flow");
                 if (pendingRequest instanceof PayPalPendingRequest.Started) {
+                    Log.d("FlutterBraintreePayPalHandler", "Stored pending request Started");
                     SharedPreferences.Editor editor = sharedPreferences.edit();
                     editor.putBoolean(PENDING_KEY, true);
                     editor.apply();
                     Log.d("FlutterBraintreePayPalHandler", "Stored pending request");
                 } else if (pendingRequest instanceof PayPalPendingRequest.Failure) {
+                    Log.e("FlutterBraintreePayPalHandler", "PayPal flow failed", 
+                        ((PayPalPendingRequest.Failure) pendingRequest).getError());
                     PayPalPendingRequest.Failure failure = (PayPalPendingRequest.Failure) pendingRequest;
                     activity.onError(failure.getError());
                 } else {
@@ -133,6 +148,8 @@ public class FlutterBraintreePayPalHandler {
                     activity.onError(new Exception("Unexpected pending request result"));
                 }
             } else if (paymentAuthRequest instanceof PayPalPaymentAuthRequest.Failure) {
+                Log.e("FlutterBraintreePayPalHandler", "PayPal flow failed", 
+                    ((PayPalPaymentAuthRequest.Failure) paymentAuthRequest).getError());
                 PayPalPaymentAuthRequest.Failure failure = 
                     (PayPalPaymentAuthRequest.Failure) paymentAuthRequest;
                 activity.onError(failure.getError());
@@ -166,6 +183,8 @@ public class FlutterBraintreePayPalHandler {
         PayPalVaultRequest request = new PayPalVaultRequest(false);
         request.setDisplayName(displayName);
         request.setBillingAgreementDescription(billingAgreementDescription);
+
+        Log.d("FlutterBraintreePayPalHandler", "Created Vault flow request = " + request);
         return request;
     }
 
@@ -188,12 +207,16 @@ public class FlutterBraintreePayPalHandler {
         request.setDisplayName(displayName);
         request.setBillingAgreementDescription(billingAgreementDescription);
         
+        Log.d("FlutterBraintreePayPalHandler", "Created Checkout flow request = " + request);
         return request;
     }
 
 
     private PayPalPaymentIntent getPaymentIntent(Intent intent) {
+        Log.d("FlutterBraintreePayPalHandler", "getPaymentIntent");
+
         String paymentIntent = intent.getStringExtra("payPalPaymentIntent");
+        Log.d("FlutterBraintreePayPalHandler", "paymentIntent: " + paymentIntent);
         switch (paymentIntent) {
             case "order":
                 return PayPalPaymentIntent.ORDER;
@@ -205,17 +228,24 @@ public class FlutterBraintreePayPalHandler {
     }
 
     private void completePayPalFlow(PayPalPaymentAuthResult.Success paymentAuthResult) {
+        Log.d("FlutterBraintreePayPalHandler", "completePayPalFlow");
+
         payPalClient.tokenize(paymentAuthResult, result -> {
             if (result instanceof PayPalResult.Success) {
+                Log.d("FlutterBraintreePayPalHandler", "PayPal flow completed successfully");
                 PayPalResult.Success success = (PayPalResult.Success) result;
                 activity.onPaymentMethodNonceCreated(success.getNonce(), activity.createEmptyBillingAddress());
-            } 
-            else if (result instanceof PayPalResult.Failure) {
+            } else if (result instanceof PayPalResult.Failure) {
+                Log.e("FlutterBraintreePayPalHandler", "PayPal flow failed", 
+                    ((PayPalResult.Failure) result).getError());
                 PayPalResult.Failure failure = (PayPalResult.Failure) result;
                 activity.onError(failure.getError());
-            }
-            else if (result instanceof PayPalResult.Cancel) {
+            } else if (result instanceof PayPalResult.Cancel) {
+                Log.d("FlutterBraintreePayPalHandler", "User cancelled PayPal flow");
                 activity.onCancel();
+            } else {
+                Log.e("FlutterBraintreePayPalHandler", "Unexpected PayPal flow result");
+                activity.onError(new Exception("Unexpected PayPal flow result"));
             }
             clearPendingRequest();
         });
@@ -224,6 +254,7 @@ public class FlutterBraintreePayPalHandler {
     // Store pending request
 
     private void storePendingRequest(PayPalPendingRequest request) {
+        Log.d("FlutterBraintreePayPalHandler", "storePendingRequest");
         SharedPreferences.Editor editor = sharedPreferences.edit();
         String json = gson.toJson(request);
         editor.putString(PENDING_REQUEST_KEY, json);
@@ -231,6 +262,7 @@ public class FlutterBraintreePayPalHandler {
     }
 
     private PayPalPendingRequest getPendingRequestFromPersistentStore() {
+        Log.d("FlutterBraintreePayPalHandler", "getPendingRequestFromPersistentStore");
         String json = sharedPreferences.getString(PENDING_REQUEST_KEY, null);
         if (json != null) {
             return gson.fromJson(json, PayPalPendingRequest.class);
@@ -239,10 +271,12 @@ public class FlutterBraintreePayPalHandler {
     }
 
     private boolean hasPendingRequest() {
+        Log.d("FlutterBraintreePayPalHandler", "hasPendingRequest");
         return sharedPreferences.getBoolean(PENDING_KEY, false);
     }
 
     private void clearPendingRequest() {
+        Log.d("FlutterBraintreePayPalHandler", "clearPendingRequest");
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.remove(PENDING_REQUEST_KEY);
         editor.apply();

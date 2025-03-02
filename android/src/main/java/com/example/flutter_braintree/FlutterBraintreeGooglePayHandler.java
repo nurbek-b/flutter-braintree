@@ -24,47 +24,61 @@ public class FlutterBraintreeGooglePayHandler {
     
 
     public FlutterBraintreeGooglePayHandler(FlutterBraintreeCustom activity) {
+        Log.d("FlutterBraintreeGooglePayHandler", "FlutterBraintreeGooglePayHandler");
+
         this.activity = activity;
 
         String authorization = activity.getIntent().getStringExtra("authorization");
 
         this.googlePayClient = new GooglePayClient(activity, authorization);
         this.googlePayLauncher = new GooglePayLauncher(activity, paymentAuthResult -> {
+            Log.d("FlutterBraintreeGooglePayHandler", "GooglePayLauncher paymentAuthResult = " + paymentAuthResult);
             googlePayClient.tokenize(paymentAuthResult, result -> {
                 if (result instanceof GooglePayResult.Success) {
+                    Log.d("FlutterBraintreeGooglePayHandler", "GooglePayLauncher result = " + result);
                     GooglePayResult.Success success = (GooglePayResult.Success) result;
                     activity.onPaymentMethodNonceCreated(success.getNonce(), activity.createEmptyBillingAddress());
                 } else if (result instanceof GooglePayResult.Failure) {
+                    Log.d("FlutterBraintreeGooglePayHandler", "GooglePayLauncher result = " + result);
                     GooglePayResult.Failure failure = (GooglePayResult.Failure) result;
                     activity.onError(failure.getError());
                 } else if (result instanceof GooglePayResult.Cancel) {
+                    Log.d("FlutterBraintreeGooglePayHandler", "GooglePayLauncher result = " + result);
                     activity.onCancel();
+                } else {
+                    Log.d("FlutterBraintreeGooglePayHandler", "GooglePayLauncher result = " + result);
+                    activity.onError(new Exception("Unexpected Google Pay result type"));
                 }
             });
         });
     }
 
     public void startGooglePaymentFlow(Intent intent) {
+        Log.d("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow");
         try {
             googlePayClient.isReadyToPay(activity, readinessResult -> {
-                Log.e("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow readinessResult = " + readinessResult);
                 if (readinessResult instanceof GooglePayReadinessResult.ReadyToPay) {
+                    Log.d("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow Google Pay is ready");
                     GooglePayRequest request = createGooglePayRequest(intent);
                     googlePayClient.createPaymentAuthRequest(request, paymentAuthRequest -> {
                         Log.e("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow paymentAuthRequest = " + paymentAuthRequest);
                         if (paymentAuthRequest instanceof GooglePayPaymentAuthRequest.ReadyToLaunch) {
+                            Log.d("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow paymentAuthRequest = ReadyToLaunch");
                             googlePayLauncher.launch(
                                 (GooglePayPaymentAuthRequest.ReadyToLaunch) paymentAuthRequest
                             );
                         } else if (paymentAuthRequest instanceof GooglePayPaymentAuthRequest.Failure) {
+                            Log.d("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow paymentAuthRequest = Failure");
                             GooglePayPaymentAuthRequest.Failure failure =
                                 (GooglePayPaymentAuthRequest.Failure) paymentAuthRequest;
                             activity.onError(failure.getError());
                         } else {
+                            Log.d("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow paymentAuthRequest = Unexpected");
                             activity.onError(new Exception("Unexpected paymentAuthRequest type"));
                         }
                     });
                 } else {
+                    Log.d("FlutterBraintreeGooglePayHandler", "startGooglePaymentFlow Google Pay is not ready");
                     activity.onError(new Exception("Google Pay is not ready"));
                 }
             });
@@ -75,6 +89,8 @@ public class FlutterBraintreeGooglePayHandler {
     }
 
     private GooglePayRequest createGooglePayRequest(Intent intent) {
+        Log.d("FlutterBraintreeGooglePayHandler", "createGooglePayRequest");
+
         String totalPrice = intent.getStringExtra("totalPrice");
         Log.d("FlutterBraintreeGooglePayHandler", "totalPrice = " + totalPrice);
 
@@ -88,6 +104,7 @@ public class FlutterBraintreeGooglePayHandler {
         request.setPhoneNumberRequired(true);
         request.setBillingAddressFormat(GooglePayBillingAddressFormat.FULL);
 
+        Log.d("FlutterBraintreeGooglePayHandler", "createGooglePayRequest request = " + request);
         return request;
     }
 
@@ -96,12 +113,12 @@ public class FlutterBraintreeGooglePayHandler {
         googlePayClient.isReadyToPay(activity, readinessResult -> {
             Intent result = new Intent();
             if (readinessResult instanceof GooglePayReadinessResult.ReadyToPay) {
-                // Success case - ready to pay
+                Log.d("FlutterBraintreeCustom", "checkGooglePayReady Google Pay is ready");
                 result.putExtra("type", "isReadyToPay");
                 result.putExtra("isReadyToPay", true);
                 activity.setResult(FlutterBraintreeCustom.RESULT_OK, result);
             } else {
-                // Not ready case
+                Log.d("FlutterBraintreeCustom", "checkGooglePayReady Google Pay is not ready");
                 result.putExtra("error", "Google Pay is not ready");
                 activity.setResult(FlutterBraintreeCustom.RESULT_CANCELED, result);
             }
