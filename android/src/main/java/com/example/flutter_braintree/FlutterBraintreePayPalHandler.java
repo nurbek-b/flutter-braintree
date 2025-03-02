@@ -133,11 +133,8 @@ public class FlutterBraintreePayPalHandler {
                 );
                 Log.d("FlutterBraintreePayPalHandler", "Launched PayPal flow");
                 if (pendingRequest instanceof PayPalPendingRequest.Started) {
-                    Log.d("FlutterBraintreePayPalHandler", "Stored pending request Started");
-                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                    editor.putBoolean(PENDING_KEY, true);
-                    editor.apply();
-                    Log.d("FlutterBraintreePayPalHandler", "Stored pending request");
+                    Log.d("FlutterBraintreePayPalHandler", "Storing pending request Started");
+                    storePendingRequest((PayPalPendingRequest.Started) pendingRequest);
                 } else if (pendingRequest instanceof PayPalPendingRequest.Failure) {
                     Log.e("FlutterBraintreePayPalHandler", "PayPal flow failed", 
                         ((PayPalPendingRequest.Failure) pendingRequest).getError());
@@ -258,6 +255,7 @@ public class FlutterBraintreePayPalHandler {
         SharedPreferences.Editor editor = sharedPreferences.edit();
         String json = gson.toJson(request);
         editor.putString(PENDING_REQUEST_KEY, json);
+        editor.putBoolean(PENDING_KEY, true);
         editor.apply();
     }
 
@@ -279,6 +277,7 @@ public class FlutterBraintreePayPalHandler {
         Log.d("FlutterBraintreePayPalHandler", "clearPendingRequest");
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.remove(PENDING_REQUEST_KEY);
+        editor.remove(PENDING_KEY);
         editor.apply();
     }
 
