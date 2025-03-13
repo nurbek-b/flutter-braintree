@@ -62,7 +62,7 @@ public class FlutterBraintreePayPalHandler {
 
         if (!hasPendingRequest()) {
             Log.d("FlutterBraintreePayPalHandler", "No pending request");
-            activity.onCancel();
+            // activity.onCancel();
             return;
         }
 
@@ -75,7 +75,7 @@ public class FlutterBraintreePayPalHandler {
         }
         Log.d("FlutterBraintreePayPalHandler", "Pending request restored" + pendingRequest.getPendingRequestString());
 
-        PayPalPaymentAuthResult result = payPalLauncher.handleReturnToApp(intent);
+        PayPalPaymentAuthResult result = payPalLauncher.handleReturnToApp(pendingRequest, intent);
         
         if (result instanceof PayPalPaymentAuthResult.Success) {
             Log.d("FlutterBraintreePayPalHandler", "PayPal flow completed successfully");
@@ -239,7 +239,7 @@ public class FlutterBraintreePayPalHandler {
         Log.d("FlutterBraintreePayPalHandler", "getPendingRequestFromPersistentStore");
         String pendingRequestString = sharedPreferences.getString(PENDING_REQUEST_KEY, null);
         if (pendingRequestString != null) {
-            return PayPalPendingRequest.Started.fromString(pendingRequestString);
+            return new PayPalPendingRequest.Started(pendingRequestString);
         }
         Log.e("FlutterBraintreePayPalHandler", "No pending request found in persistent store");
         return null;

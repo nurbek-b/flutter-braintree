@@ -1,5 +1,10 @@
 package com.example.flutter_braintree;
 
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -34,6 +39,8 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d("FlutterBraintreeCustom", "onCreate with intent: " + getIntent());
+        handleIntent(getIntent());
 
         creationTimestamp = System.currentTimeMillis();
   
@@ -91,6 +98,24 @@ public class FlutterBraintreeCustom extends AppCompatActivity {
             setResult(2, result);
             finish();
             return;
+        }
+    }
+
+    private void handleIntent(Intent intent) {
+        Log.d("FlutterBraintreeCustom", "handleIntent: " + intent);
+        if (intent != null) {
+            String action = intent.getAction();
+            Uri data = intent.getData();
+            Log.d("FlutterBraintreeCustom", "Action: " + action + ", Data: " + data);
+            
+            if (Intent.ACTION_VIEW.equals(action) && data != null) {
+                // This is a deep link
+                if (data.getPath() != null && data.getPath().contains("cancel")) {
+                    onCancel();
+                    finish();
+                    return;
+                }
+            }
         }
     }
 
