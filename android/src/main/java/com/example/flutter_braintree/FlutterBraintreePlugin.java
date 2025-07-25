@@ -15,7 +15,7 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
+// import io.flutter.plugin.common.PluginRegistry.Registrar;
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener;
 
 public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, ActivityResultListener {
@@ -25,14 +25,14 @@ public class FlutterBraintreePlugin implements FlutterPlugin, ActivityAware, Met
     private Result activeResult;
     private String currentMethod = "";
 
-    public static void registerWith(Registrar registrar) {
-        Log.d("FlutterBraintreePlugin", "registerWith called");
-        final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_braintree.custom");
-        FlutterBraintreePlugin plugin = new FlutterBraintreePlugin();
-        plugin.activity = registrar.activity();
-        registrar.addActivityResultListener(plugin);
-        channel.setMethodCallHandler(plugin);
-    }
+    // public static void registerWith(Registrar registrar) {
+    //     Log.d("FlutterBraintreePlugin", "registerWith called");
+    //     final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_braintree.custom");
+    //     FlutterBraintreePlugin plugin = new FlutterBraintreePlugin();
+    //     plugin.activity = registrar.activity();
+    //     registrar.addActivityResultListener(plugin);
+    //     channel.setMethodCallHandler(plugin);
+    // }
 
     @Override
     public void onAttachedToEngine(FlutterPluginBinding binding) {
